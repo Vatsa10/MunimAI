@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -2085,6 +2086,193 @@
     }
     .auth-screen { scroll-behavior:auto; }
   }
+
+  /* ---- Subtle SaaS surface -------------------------------------------------
+     Palette + type override for the public landing. Layout and markup above
+     stay as-is; this block only restates colours, weights, and typefaces.
+     ponytail: one override block instead of rewriting 400 lines of rules. */
+  .auth-screen {
+    --auth-ink:#f7f9fb;
+    --auth-line:#e5e9ef;
+    --auth-green:#0f7a55;
+    --auth-green-deep:#0f7a55;
+    --auth-safety:#b45309;
+    --auth-text:#0f172a;
+    --auth-muted:#5b6675;
+    --auth-panel:#ffffff;
+    background:var(--auth-ink); color:var(--auth-text);
+    font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  }
+  .auth-screen h1,.auth-screen h2,.auth-screen h3,.auth-site-brand,.auth-footer-brand {
+    font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;
+  }
+  .auth-screen::before {
+    opacity:1; animation:none;
+    background:
+      radial-gradient(circle at 82% 6%,rgba(15,122,85,.07),transparent 42%),
+      linear-gradient(rgba(15,23,42,.028) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(15,23,42,.028) 1px,transparent 1px);
+    background-size:auto,64px 64px,64px 64px;
+  }
+  .auth-screen::after { display:none; }
+
+  .auth-site-nav {
+    height:70px; border-bottom:1px solid var(--auth-line);
+    background:rgba(255,255,255,.85);
+  }
+  .auth-site-brand { color:var(--auth-text); font-size:19px; font-weight:800; letter-spacing:-.02em; }
+  /* The old ring-and-dot mark read as a "C". Use the favicon so the landing,
+     the tab icon, and the app header all show the same M. */
+  .auth-brand-mark {
+    width:30px; height:30px; border:0; border-radius:8px; transform:none;
+    background:url('/assets/munim-favicon.svg') center/contain no-repeat;
+  }
+  .auth-brand-mark::after { display:none; }
+  .auth-nav-links { gap:22px; }
+  .auth-nav-links a { color:var(--auth-muted); font-size:13px; font-weight:500; }
+  .auth-nav-links a:hover { color:var(--auth-text); }
+  .auth-nav-signin {
+    padding:9px 14px; border:0; background:none; color:var(--auth-muted);
+    font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .auth-nav-signin:hover { color:var(--auth-text); }
+  .auth-nav-cta {
+    padding:9px 16px; border:1px solid var(--auth-green); border-radius:8px;
+    background:var(--auth-green); color:#fff; font-size:13px; font-weight:600;
+  }
+  .auth-nav-cta:hover { background:#0c6446; }
+
+  .auth-hero {
+    grid-template-columns:1fr; min-height:auto;
+    max-width:1120px; margin:0 auto; padding:104px 4vw 88px;
+    gap:0; align-items:start;
+  }
+  .auth-hero-copy { max-width:760px; }
+  .auth-industrial-stage { display:none; }
+  .auth-eyebrow {
+    margin-bottom:20px; color:var(--auth-green); font-size:11px;
+    font-weight:600; letter-spacing:.12em;
+  }
+  .auth-eyebrow::before { width:22px; height:1px; background:var(--auth-green); box-shadow:none; }
+  .auth-display {
+    max-width:16ch; color:var(--auth-text); font-size:clamp(38px,4.6vw,62px);
+    line-height:1.08; font-weight:700; letter-spacing:-.028em;
+  }
+  .auth-display .auth-outline {
+    display:inline; color:var(--auth-muted); -webkit-text-stroke:0;
+  }
+  .auth-display .auth-accent { color:var(--auth-green); }
+  .auth-lede { max-width:58ch; margin-top:20px; color:var(--auth-muted); font-size:17px; line-height:1.7; }
+  .auth-hero-cta { display:flex; flex-wrap:wrap; gap:12px; margin-top:30px; }
+  .auth-cta-primary {
+    padding:13px 22px; border:1px solid var(--auth-green); border-radius:9px;
+    background:var(--auth-green); color:#fff; font-size:14px; font-weight:600;
+    cursor:pointer; transition:background .18s ease;
+  }
+  .auth-cta-primary:hover { background:#0c6446; }
+  .auth-cta-ghost {
+    padding:13px 22px; border:1px solid #d5dbe4; border-radius:9px;
+    background:#fff; color:var(--auth-text); font-size:14px; font-weight:600;
+    cursor:pointer; transition:border-color .18s ease;
+  }
+  .auth-cta-ghost:hover { border-color:#9aa5b4; }
+  .auth-proof-row { margin-top:30px; }
+  .auth-proof-chip {
+    border:1px solid var(--auth-line); background:#fff; color:var(--auth-muted);
+    border-radius:8px; font-size:12px; font-weight:500;
+  }
+  .auth-proof-chip .material-symbols-outlined { color:var(--auth-green); }
+  .auth-live-strip { margin-top:40px; border-top:1px solid var(--auth-line); }
+  .auth-live-stat strong { color:var(--auth-text); font-size:17px; font-weight:700; }
+  .auth-live-stat span { color:#8b95a3; font-size:10px; font-weight:600; letter-spacing:.09em; }
+
+  /* Access overlay */
+  .auth-dialog { position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:20px; }
+  .auth-dialog.hidden { display:none; }
+  .auth-dialog-backdrop { position:absolute; inset:0; background:rgba(15,23,42,.42); backdrop-filter:blur(3px); }
+  .auth-dialog .auth-form-shell {
+    position:relative; z-index:1; justify-self:center; max-width:420px;
+    max-height:calc(100vh - 40px); overflow-y:auto;
+  }
+  .auth-dialog .auth-form-shell::before { display:none; }
+  .auth-dialog-close {
+    position:absolute; right:14px; top:10px; z-index:2; width:32px; height:32px;
+    border:0; border-radius:8px; background:none; color:#8b95a3;
+    font-size:22px; line-height:1; cursor:pointer;
+  }
+  .auth-dialog-close:hover { background:#eef1f5; color:var(--auth-text); }
+  .auth-card {
+    border:1px solid var(--auth-line); border-radius:14px; background:#fff;
+    box-shadow:0 24px 60px -30px rgba(15,23,42,.4); backdrop-filter:none;
+  }
+  .auth-card::before { display:none; }
+  .auth-card-topline { color:#8b95a3; font-size:10px; font-weight:600; letter-spacing:.09em; }
+  .auth-card-step { color:var(--auth-muted); }
+  .auth-title { color:var(--auth-text); font-size:24px; font-weight:700; letter-spacing:-.02em; }
+  .auth-sub { color:var(--auth-muted); }
+  .auth-label { color:#6b7684; font-size:10px; letter-spacing:.1em; }
+  .auth-input, .auth-phone { border-color:#d9dfe7; border-radius:9px; }
+  .auth-phone:focus-within, .auth-input:focus {
+    border-color:var(--auth-green) !important; box-shadow:0 0 0 3px rgba(15,122,85,.12);
+    transform:none;
+  }
+  .auth-primary { border-radius:9px; background:var(--auth-green); font-size:14px; font-weight:600; }
+  .auth-primary::after { display:none; }
+  .auth-primary:hover { background:#0c6446; transform:none; box-shadow:none; }
+  .auth-link { color:var(--auth-green); }
+
+  /* Content sections */
+  .auth-ticker { border-color:var(--auth-line); background:#fff; }
+  .auth-ticker-item { color:#8b95a3; font-size:11px; font-weight:600; letter-spacing:.1em; }
+  .auth-ticker-item::after { border-color:var(--auth-green); }
+  .auth-story { padding:96px 4vw; background:#fff; border-top:1px solid var(--auth-line); }
+  .auth-kicker { color:var(--auth-green); font-size:11px; font-weight:600; letter-spacing:.12em; }
+  .auth-section-title {
+    color:var(--auth-text); font-size:clamp(28px,3.2vw,44px);
+    line-height:1.12; font-weight:700; letter-spacing:-.026em;
+  }
+  .auth-section-copy { color:var(--auth-muted); font-size:16px; }
+  .auth-workflow-grid { border:1px solid var(--auth-line); border-radius:14px; }
+  .auth-workflow-card {
+    min-height:auto; padding:32px; border-right:1px solid var(--auth-line);
+    background:#fff;
+  }
+  .auth-workflow-card:hover { background:#fafbfc; }
+  .auth-workflow-number { color:#9aa5b4; font-size:11px; font-weight:600; letter-spacing:.1em; }
+  .auth-workflow-icon {
+    width:44px; height:44px; margin:26px 0 20px; border:1px solid var(--auth-line);
+    border-radius:10px; background:#f4f7f6; color:var(--auth-green);
+  }
+  .auth-workflow-icon .material-symbols-outlined { font-size:22px; }
+  .auth-workflow-card h3 { color:var(--auth-text); font-size:18px; font-weight:700; letter-spacing:-.015em; }
+  .auth-workflow-card p { color:var(--auth-muted); font-size:14px; }
+  .auth-capabilities { padding:96px 4vw; background:#f7f9fb; border-top:1px solid var(--auth-line); }
+  .auth-capabilities .auth-kicker { color:var(--auth-green); }
+  .auth-capabilities .auth-section-title { color:var(--auth-text); }
+  .auth-capabilities .auth-section-copy { color:var(--auth-muted); }
+  .auth-capability { border:1px solid var(--auth-line); border-radius:14px; background:#fff; padding:28px; }
+  .auth-capability .material-symbols-outlined { color:var(--auth-green); font-size:24px; }
+  .auth-capability h3 { margin-top:32px; color:var(--auth-text); font-size:18px; font-weight:700; letter-spacing:-.015em; }
+  .auth-capability p { color:var(--auth-muted); font-size:14px; }
+  .auth-capability-code { color:#9aa5b4; font-weight:600; font-size:9px; }
+  .auth-capability-signal { display:none; }
+  .auth-landing-footer {
+    background:#fff; border-top:1px solid var(--auth-line);
+    color:var(--auth-muted); font-size:13px;
+  }
+  .auth-footer-brand { color:var(--auth-text); font-size:15px; font-weight:700; }
+  .auth-footer-brand span { color:var(--auth-green); }
+
+  @media (max-width:820px) {
+    .auth-hero { padding:64px 20px 56px; }
+    .auth-nav-links a { display:none; }
+    .auth-nav-links { gap:6px; }
+  }
+  @media (max-width:520px) {
+    .auth-hero { padding:48px 18px 44px; }
+    .auth-hero-cta button { flex:1 1 100%; }
+    .auth-live-strip { display:grid; grid-template-columns:1fr; }
+  }
 </style>
 </head>
 <body class="min-h-screen bg-[var(--surface)] text-slate-900">
@@ -2100,7 +2288,8 @@
     <div class="auth-nav-links">
       <a href="#authHow">How it works</a>
       <a href="#authCapabilities">Capabilities</a>
-      <button class="auth-nav-cta" onclick="document.getElementById('authPhone').focus()">Enter workspace</button>
+      <button class="auth-nav-signin" onclick="openAuthDialog('authStepLogin')">Sign in</button>
+      <button class="auth-nav-cta" onclick="openAuthDialog('authStepSignup')">Get started</button>
     </div>
   </nav>
 
@@ -2117,6 +2306,10 @@
           Speak a sale. Count a rack. Chase an udhaar. Munim turns real shop-floor
           conversations into clean stock, customer, billing, and margin records.
         </p>
+        <div class="auth-hero-cta">
+          <button class="auth-cta-primary" onclick="openAuthDialog('authStepSignup')">Create your workspace</button>
+          <button class="auth-cta-ghost" onclick="openAuthDialog('authStepLogin')">Sign in</button>
+        </div>
         <div class="auth-proof-row" aria-label="Key capabilities">
           <span class="auth-proof-chip"><span class="material-symbols-outlined">graphic_eq</span>All Sarvam languages</span>
           <span class="auth-proof-chip"><span class="material-symbols-outlined">psychology</span>Self-learning system</span>
@@ -2154,7 +2347,15 @@
         </div>
       </div>
 
-      <aside class="auth-form-shell" aria-label="Account access">
+    </section>
+
+    <!-- Access panel lives in its own overlay so the hero stays a clean
+         marketing surface instead of a login form. -->
+    <div class="auth-dialog hidden" id="authDialog" role="dialog" aria-modal="true"
+         aria-label="Account access">
+      <div class="auth-dialog-backdrop" onclick="closeAuthDialog()"></div>
+      <aside class="auth-form-shell">
+        <button class="auth-dialog-close" onclick="closeAuthDialog()" aria-label="Close">&#215;</button>
         <div class="auth-card">
           <div class="auth-card-topline">
             <span class="auth-card-status">System ready</span>
@@ -2228,7 +2429,7 @@
           </div>
         </div>
       </aside>
-    </section>
+    </div>
 
     <div class="auth-ticker" aria-hidden="true">
       <div class="auth-ticker-track">
@@ -2336,8 +2537,8 @@
   <div class="topbar-inner">
     <div class="brand-lockup">
       <svg class="brand-symbol" viewBox="0 0 44 44" aria-hidden="true">
-        <path d="M32 9.5a16.5 16.5 0 1 0 0 25" fill="none" stroke="#111827" stroke-width="6" stroke-linecap="square"/>
-        <circle cx="34.5" cy="22" r="3.4" fill="#006c49"/>
+        <path d="M9 32V13l9.5 11.5L28 13v19" fill="none" stroke="#0f172a" stroke-width="5.5" stroke-linecap="square"/>
+        <circle cx="35.5" cy="29.5" r="3.4" fill="#0f7a55"/>
       </svg>
       <div class="brand-copy">
         <div class="brand-name" aria-label="Munim dot ai">Munim<span class="brand-ai">.ai</span></div>
@@ -4495,8 +4696,28 @@ function showAuth(step){
   ['authStepLogin','authStepSignup','authStepOnboard'].forEach(id=>
     document.getElementById(id).classList.toggle('hidden', id!== (step||'authStepLogin')));
   authError('');
+  // Signup and onboarding are mid-flow, so the panel must stay open. A bare
+  // login step is the page-load case: show the landing, not the form.
+  if(step==='authStepSignup'||step==='authStepOnboard') openAuthDialog();
 }
-function hideAuth(){ document.getElementById('authScreen').classList.add('hidden'); }
+function hideAuth(){
+  document.getElementById('authDialog').classList.add('hidden');
+  document.getElementById('authScreen').classList.add('hidden');
+}
+function openAuthDialog(step){
+  if(step){
+    showAuth(step);
+    const first=document.querySelector('#authDialog > .auth-form-shell .auth-input, #authDialog input');
+    if(first) setTimeout(()=>first.focus(),0);
+  }
+  document.getElementById('authDialog').classList.remove('hidden');
+}
+function closeAuthDialog(){
+  // Onboarding is required before the app is usable, so it is not dismissible.
+  if(!document.getElementById('authStepOnboard').classList.contains('hidden')) return;
+  document.getElementById('authDialog').classList.add('hidden');
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeAuthDialog(); });
 function authError(msg){
   const el=document.getElementById('authError');
   el.textContent=msg||''; el.classList.toggle('hidden', !msg);
