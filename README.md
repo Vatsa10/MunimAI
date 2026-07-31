@@ -278,6 +278,25 @@ MUNIM_TEST_RECIPIENT=+91...
 CRON_SECRET=replace-with-a-random-cron-secret
 ```
 
+Everything below is optional; each has a working default.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MUNIM_TZ` | `Asia/Kolkata` | Timezone used for "today", summaries, and due dates. |
+| `MUNIM_TODAY` | real date | Pins the date (`YYYY-MM-DD`) for demos and deterministic tests. |
+| `MUNIM_DATA_DIR` | `data/` | File-store location when `DATABASE_URL` is unset. |
+| `MUNIM_REASONING` | off | Enables extra agent reasoning output. |
+| `MUNIM_CRON_TOKEN` | — | Alternative accepted token for the cron endpoint. |
+| `MUNIM_URL` | `https://munimai.vercel.app` | Base URL targeted by the scenario runner. |
+| `MUNIM_PROBE_CALLER` / `MUNIM_PROBE_TEXT` | — | Inputs for the `probe_agent.py` voice probe. |
+| `SARVAM_CHAT_MODEL` | model default | Overrides the chat model. |
+| `SARVAM_TTS_SPEAKER` | voice default | Overrides the TTS speaker. |
+| `SARVAM_MAX_TIMEOUT` | client default | Sarvam HTTP timeout in seconds. |
+| `TWILIO_SMS_FROM` | — | SMS sender; only needed for SMS fallback. |
+
+Without `DATABASE_URL` the app runs entirely on JSON files under
+`MUNIM_DATA_DIR`, which is enough for a local demo but not for real use.
+
 Generate application secrets with:
 
 ```bash
