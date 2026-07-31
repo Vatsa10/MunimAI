@@ -1,0 +1,64 @@
+{
+  "supplier": "Shree Balaji Steel & Cement Traders",
+  "invoice_no": "SB/2026-27/0501",
+  "invoice_date": "2026-07-30",
+  "image": "sample_invoice.png",
+  "note": "Deterministic fallback used when SARVAM_API_KEY is absent or Document Digitization fails. Product descriptions and units intentionally match the inventory schema; landed cost excludes GST and includes prorated freight.",
+  "lines": [
+    {
+      "line_id": "L1",
+      "raw_text": "Tata Tiscon TMT Bar 12mm Fe500D  3.00 tonne  @ 58000  1,74,000.00",
+      "product_phrase": "Tata Tiscon TMT Bar 12mm Fe500D",
+      "qty": 3.0, "unit": "tonne",
+      "taxable_value": 174000.0, "gst_rate": 18,
+      "certain": true,
+      "bbox": [0.06, 0.28, 0.94, 0.34]
+    },
+    {
+      "line_id": "L2",
+      "raw_text": "Tata Tiscon TMT Bar 16mm Fe500D  2.00 tonne  @ 57000  1,14,000.00",
+      "product_phrase": "Tata Tiscon TMT Bar 16mm Fe500D",
+      "qty": 2.0, "unit": "tonne",
+      "taxable_value": 114000.0, "gst_rate": 18,
+      "certain": true,
+      "bbox": [0.06, 0.35, 0.94, 0.41]
+    },
+    {
+      "line_id": "L3",
+      "raw_text": "UltraTech OPC 53 Cement 50kg  100 bori  @ 415  41,500.00",
+      "product_phrase": "UltraTech OPC 53 Cement 50kg",
+      "qty": 100.0, "unit": "bori",
+      "taxable_value": 41500.0, "gst_rate": 28,
+      "certain": true,
+      "bbox": [0.06, 0.42, 0.94, 0.48]
+    },
+    {
+      "line_id": "L4",
+      "raw_text": "UltraTech PPC Cement 50kg  8̶0 100 bori (handwritten)  @ 390  39,000.00",
+      "product_phrase": "UltraTech PPC Cement 50kg",
+      "qty": null, "unit": "bori",
+      "taxable_value": 39000.0, "gst_rate": 28,
+      "certain": false,
+      "handwritten_correction": {"struck": 80.0, "written": 100.0, "field": "qty"},
+      "bbox": [0.06, 0.49, 0.94, 0.56]
+    },
+    {
+      "line_id": "L5",
+      "raw_text": "Kajaria Ceramic Floor Tile 2x2ft  40 Box  @ 700  28,000.00",
+      "product_phrase": "Kajaria Ceramic Floor Tile 2x2ft",
+      "qty": 40.0, "unit": "box",
+      "taxable_value": 28000.0, "gst_rate": 28,
+      "certain": true,
+      "bbox": [0.06, 0.56, 0.94, 0.62]
+    },
+    {
+      "line_id": "F1",
+      "raw_text": "Transport / Freight (LR No. 2291)  6,500.00",
+      "product_phrase": null,
+      "is_freight": true,
+      "freight_value": 6500.0,
+      "certain": true,
+      "bbox": [0.06, 0.66, 0.94, 0.71]
+    }
+  ]
+}

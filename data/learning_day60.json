@@ -1,0 +1,227 @@
+{
+  "aliases_learned": [
+    {
+      "phrase": "barah mm",
+      "sku_id": "TMT_12_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "solah mm",
+      "sku_id": "TMT_16_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "tiscon barah",
+      "sku_id": "TMT_12_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "tiscon solah",
+      "sku_id": "TMT_16_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "tata barah mm",
+      "sku_id": "TMT_12_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "tata solah mm",
+      "sku_id": "TMT_16_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "chhota sariya",
+      "sku_id": "TMT_12_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "mota sariya",
+      "sku_id": "TMT_16_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "patla rod",
+      "sku_id": "TMT_12_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "patla sariya",
+      "sku_id": "TMT_12_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "patla bar",
+      "sku_id": "TMT_12_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "mota bar",
+      "sku_id": "TMT_16_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "mota rod",
+      "sku_id": "TMT_16_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "12 wala",
+      "sku_id": "TMT_12_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "16 wala",
+      "sku_id": "TMT_16_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "das mm",
+      "sku_id": "TMT_12_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "sariya barah",
+      "sku_id": "TMT_12_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "sariya solah",
+      "sku_id": "TMT_16_FE500D_TATA",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "ultratech 53",
+      "sku_id": "CEM_ULTRATECH_OPC53",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "ultratech opc",
+      "sku_id": "CEM_ULTRATECH_OPC53",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "opc cement",
+      "sku_id": "CEM_ULTRATECH_OPC53",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "ppc cement",
+      "sku_id": "CEM_ULTRATECH_PPC",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "ultratech ppc",
+      "sku_id": "CEM_ULTRATECH_PPC",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "cement ultratech",
+      "sku_id": "CEM_ULTRATECH_OPC53",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "teri cement",
+      "sku_id": "CEM_ULTRATECH_OPC53",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "safed cement",
+      "sku_id": "CEM_ULTRATECH_PPC",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "bori cement",
+      "sku_id": "CEM_ULTRATECH_OPC53",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "kajaria tile",
+      "sku_id": "TILE_KAJARIA_CERAMIC_2X2",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "floor tile",
+      "sku_id": "TILE_KAJARIA_CERAMIC_2X2",
+      "confirmed_at": "2026-07-26"
+    },
+    {
+      "phrase": "chhoti tile",
+      "sku_id": "TILE_KAJARIA_CERAMIC_2X2",
+      "confirmed_at": "2026-07-26"
+    }
+  ],
+  "attribute_priors": [
+    {
+      "family": "tmt",
+      "attribute": "diameter_mm",
+      "value": 12,
+      "count": 19
+    },
+    {
+      "family": "tmt",
+      "attribute": "grade",
+      "value": "Fe500D",
+      "count": 31
+    },
+    {
+      "family": "tmt",
+      "attribute": "brand",
+      "value": "Tata Tiscon",
+      "count": 22
+    },
+    {
+      "family": "cement",
+      "attribute": "brand",
+      "value": "UltraTech",
+      "count": 18
+    },
+    {
+      "family": "cement",
+      "attribute": "type",
+      "value": "OPC 53",
+      "count": 15
+    },
+    {
+      "family": "tiles",
+      "attribute": "brand",
+      "value": "Kajaria",
+      "count": 9
+    }
+  ],
+  "unit_priors": [
+    {
+      "sku_id": "TMT_12_FE500D_TATA",
+      "unit": "tonne",
+      "count": 14
+    },
+    {
+      "sku_id": "CEM_ULTRATECH_OPC53",
+      "unit": "bori",
+      "count": 26
+    },
+    {
+      "sku_id": "TMT_16_FE500D_TATA",
+      "unit": "tonne",
+      "count": 8
+    }
+  ],
+  "corrections": [
+    {
+      "spoken": "chhota sariya",
+      "chosen_sku": "TMT_12_FE500D_TATA",
+      "rejected": [
+        "TMT_16_FE500D_TATA"
+      ],
+      "ts": "2026-07-26"
+    },
+    {
+      "spoken": "mota rod",
+      "chosen_sku": "TMT_16_FE500D_TATA",
+      "rejected": [
+        "TMT_12_FE500D_TATA"
+      ],
+      "ts": "2026-07-26"
+    }
+  ]
+}

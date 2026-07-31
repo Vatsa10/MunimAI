@@ -1,0 +1,210 @@
+[
+  {
+    "sku_id": "TMT_12_FE500D_TATA",
+    "canonical": "Tata Tiscon TMT Bar 12mm Fe500D",
+    "family": "tmt",
+    "attributes": {
+      "diameter_mm": 12,
+      "grade": "Fe500D",
+      "brand": "Tata Tiscon"
+    },
+    "default_unit": "tonne",
+    "units": {
+      "kg": 1,
+      "tonne": 1000,
+      "piece": 10.67
+    },
+    "gst_rate": 18,
+    "opening_cost_per_kg": 58.47,
+    "aliases": [
+      "saria",
+      "sariya",
+      "सरिया",
+      "tmt bar",
+      "rod",
+      "tmt",
+      "bar",
+      "12mm rod",
+      "12 mm",
+      "tata",
+      "tiscon"
+    ],
+    "landed_cost_per_kg": 58.47
+  },
+  {
+    "sku_id": "TMT_16_FE500D_TATA",
+    "canonical": "Tata Tiscon TMT Bar 16mm Fe500D",
+    "family": "tmt",
+    "attributes": {
+      "diameter_mm": 16,
+      "grade": "Fe500D",
+      "brand": "Tata Tiscon"
+    },
+    "default_unit": "tonne",
+    "units": {
+      "kg": 1,
+      "tonne": 1000,
+      "piece": 18.96
+    },
+    "gst_rate": 18,
+    "opening_cost_per_kg": 57.45,
+    "aliases": [
+      "saria",
+      "sariya",
+      "सरिया",
+      "tmt bar",
+      "rod",
+      "tmt",
+      "bar",
+      "16mm rod",
+      "16 mm",
+      "tata",
+      "tiscon"
+    ],
+    "landed_cost_per_kg": 57.45
+  },
+  {
+    "sku_id": "TMT_20_FE500D_TATA",
+    "canonical": "Tata Tiscon TMT Bar 20mm Fe500D",
+    "family": "tmt",
+    "attributes": {
+      "diameter_mm": 20,
+      "grade": "Fe500D",
+      "brand": "Tata Tiscon"
+    },
+    "default_unit": "tonne",
+    "units": {
+      "kg": 1,
+      "tonne": 1000,
+      "piece": 29.63
+    },
+    "gst_rate": 18,
+    "opening_cost_per_kg": 53.5,
+    "aliases": [
+      "saria",
+      "sariya",
+      "सरिया",
+      "tmt bar",
+      "rod",
+      "tmt",
+      "bar",
+      "20mm rod",
+      "20 mm",
+      "tata",
+      "tiscon"
+    ]
+  },
+  {
+    "sku_id": "CEM_ULTRATECH_OPC53",
+    "canonical": "UltraTech OPC 53 Cement 50kg",
+    "family": "cement",
+    "attributes": {
+      "brand": "UltraTech",
+      "type": "OPC 53",
+      "weight_kg": 50
+    },
+    "default_unit": "bori",
+    "units": {
+      "bori": 1,
+      "tonne": 20,
+      "kg": 0.02
+    },
+    "gst_rate": 28,
+    "opening_cost_per_kg": 421.98,
+    "aliases": [
+      "cement",
+      "सीमेंट",
+      "bori",
+      "bag",
+      "ultratech",
+      "opc 53",
+      "ultratech cement"
+    ],
+    "landed_cost_per_kg": 421.98
+  },
+  {
+    "sku_id": "CEM_ULTRATECH_PPC",
+    "canonical": "UltraTech PPC Cement 50kg",
+    "family": "cement",
+    "attributes": {
+      "brand": "UltraTech",
+      "type": "PPC",
+      "weight_kg": 50
+    },
+    "default_unit": "bori",
+    "units": {
+      "bori": 1,
+      "tonne": 20,
+      "kg": 0.02
+    },
+    "gst_rate": 28,
+    "opening_cost_per_kg": 396.56,
+    "aliases": [
+      "cement",
+      "सीमेंट",
+      "bori",
+      "bag",
+      "ultratech",
+      "ppc",
+      "ultratech cement"
+    ],
+    "landed_cost_per_kg": 396.56
+  },
+  {
+    "sku_id": "TILE_KAJARIA_CERAMIC_2X2",
+    "canonical": "Kajaria Ceramic Floor Tile 2x2ft",
+    "family": "tiles",
+    "attributes": {
+      "brand": "Kajaria",
+      "type": "Ceramic Floor Tile 2x2ft",
+      "size": "2x2ft"
+    },
+    "default_unit": "box",
+    "units": {
+      "box": 1,
+      "piece": 0.1
+    },
+    "gst_rate": 28,
+    "opening_cost_per_kg": 711.78,
+    "aliases": [
+      "tile",
+      "tiles",
+      "टाइल",
+      "kajaria",
+      "box",
+      "floor tile",
+      "vitrified",
+      "ceramic",
+      "ceramic floor tile 2x2ft"
+    ],
+    "landed_cost_per_kg": 711.78
+  },
+  {
+    "sku_id": "TILE_KAJARIA_VITRIFIED_600",
+    "canonical": "Kajaria Vitrified Tile 600x600mm",
+    "family": "tiles",
+    "attributes": {
+      "brand": "Kajaria",
+      "type": "Vitrified Tile 600x600mm",
+      "size": "600x600mm"
+    },
+    "default_unit": "box",
+    "units": {
+      "box": 1,
+      "piece": 0.1
+    },
+    "gst_rate": 28,
+    "opening_cost_per_kg": 42.0,
+    "aliases": [
+      "tile",
+      "tiles",
+      "टाइल",
+      "kajaria",
+      "box",
+      "floor tile",
+      "vitrified",
+      "ceramic",
+      "vitrified tile 600x600mm"
+    ]
+  }
+]
