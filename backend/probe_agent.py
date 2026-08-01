@@ -13,7 +13,7 @@ transcribe it back with Sarvam STT.
 
     python3 backend/probe_agent.py "cement kitna hai" "aaj ka summary"
 
-Needs SAMVAAD_API_KEY and SARVAM_API_KEY in .env, and ffmpeg on PATH.
+Needs SARVAM_API_KEY in .env, and ffmpeg on PATH.
 
 Two things the runtime insists on, both learned the hard way:
   * Set SAMVAAD_AGENT_VERSION to reproduce a committed version. Leave it
@@ -28,6 +28,8 @@ from pydantic import SecretStr
 from sarvam_conv_ai_sdk import (AsyncSamvaadAgent, AsyncAudioInterface,
                                 InteractionConfig, InteractionType)
 from sarvam_conv_ai_sdk.messages.config import UserIdentifierType as UIT
+
+import samvaad_runtime
 
 RATE = 16000
 FRAME = int(RATE * 0.02) * 2          # 20ms of 16-bit mono
@@ -267,7 +269,7 @@ async def main():
         clips = [tts(t) for t in LINES]
         line = ScriptedLine(clips)
     agent = DiagnosticSamvaadAgent(
-        api_key=SecretStr(os.environ["SAMVAAD_API_KEY"]),
+        api_key=SecretStr(samvaad_runtime.settings().api_key),
         config=cfg, audio_interface=line,
         text_callback=on_text,
         transcript_callback=on_transcript,

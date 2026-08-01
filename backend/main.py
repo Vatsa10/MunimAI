@@ -576,7 +576,7 @@ async def samvaad_signed_url(
     """Issue a short-lived Samvaad URL to the logged-in browser.
 
     Authentication is enforced by the normal /api middleware.  The browser
-    receives a signed session URL, never SAMVAAD_API_KEY itself.
+    receives a signed session URL, never the Sarvam API key itself.
     """
     current_user()
     try:

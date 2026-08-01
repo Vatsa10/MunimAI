@@ -25,6 +25,29 @@ class SamvaadConfigurationError(RuntimeError):
     """The server cannot start an in-app Samvaad session."""
 
 
+def _env(name: str, default: str = "") -> str:
+    """Read an override, treating a placeholder as if it were never set.
+
+    A half-filled .env used to be worse than an empty one: "SAMVAAD_APP_ID=..."
+    is non-empty, so it overrode the committed default and the session failed
+    upstream at Sarvam with no local hint that the value was a placeholder.
+    """
+    value = (os.environ.get(name) or "").strip()
+    if value and any(ch.isalnum() for ch in value):
+        return value
+    return default
+
+
+def _api_key() -> str:
+    """Samvaad authenticates with the same Sarvam-issued key as the REST APIs.
+
+    SAMVAAD_API_KEY stays supported for deployments issued a separate key; it
+    otherwise falls back to SARVAM_API_KEY, which is the only Sarvam credential
+    a deployment has to set.
+    """
+    return _env("SAMVAAD_API_KEY", _env("SARVAM_API_KEY"))
+
+
 @dataclass(frozen=True)
 class SamvaadSettings:
     api_key: str
@@ -39,9 +62,7 @@ class SamvaadSettings:
 
 
 def settings() -> SamvaadSettings:
-    raw_version = (
-        os.environ.get("SAMVAAD_AGENT_VERSION") or str(DEFAULT_AGENT_VERSION)
-    ).strip()
+    raw_version = _env("SAMVAAD_AGENT_VERSION", str(DEFAULT_AGENT_VERSION))
     try:
         version = int(raw_version) if raw_version else None
     except ValueError as exc:
@@ -49,12 +70,10 @@ def settings() -> SamvaadSettings:
             "SAMVAAD_AGENT_VERSION must be a whole number."
         ) from exc
     return SamvaadSettings(
-        api_key=(os.environ.get("SAMVAAD_API_KEY") or "").strip(),
-        org_id=(os.environ.get("SAMVAAD_ORG_ID") or DEFAULT_ORG_ID).strip(),
-        workspace_id=(
-            os.environ.get("SAMVAAD_WORKSPACE_ID") or DEFAULT_WORKSPACE_ID
-        ).strip(),
-        app_id=(os.environ.get("SAMVAAD_APP_ID") or DEFAULT_APP_ID).strip(),
+        api_key=_api_key(),
+        org_id=_env("SAMVAAD_ORG_ID", DEFAULT_ORG_ID),
+        workspace_id=_env("SAMVAAD_WORKSPACE_ID", DEFAULT_WORKSPACE_ID),
+        app_id=_env("SAMVAAD_APP_ID", DEFAULT_APP_ID),
         version=version,
     )
 
@@ -72,7 +91,7 @@ def browser_config() -> dict:
     if cfg.version is not None:
         result["version"] = cfg.version
     if not cfg.enabled:
-        result["reason"] = "SAMVAAD_API_KEY is not configured on the server."
+        result["reason"] = "SARVAM_API_KEY is not configured on the server."
     return result
 
 
@@ -88,7 +107,7 @@ async def get_signed_url(
     cfg = settings()
     if not cfg.enabled:
         raise SamvaadConfigurationError(
-            "SAMVAAD_API_KEY is not configured on the server."
+            "SARVAM_API_KEY is not configured on the server."
         )
     if (org_id, workspace_id, app_id) != (
         cfg.org_id,

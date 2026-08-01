@@ -261,12 +261,7 @@ MUNIM_PUBLIC_URL=http://127.0.0.1:8000
 
 # Sarvam APIs and Samvaad v6
 SARVAM_API_KEY=...
-SAMVAAD_API_KEY=...
 SAMVAAD_WEBHOOK_SECRET=replace-with-another-long-random-value
-SAMVAAD_ORG_ID=019f9945-ebf7-77f9-b60b-dc1963284e44
-SAMVAAD_WORKSPACE_ID=019f9945-ebfb-76ac-9855-2f2c5985abbb
-SAMVAAD_APP_ID=Voice-Assis-9018c9fb-e7c8
-SAMVAAD_AGENT_VERSION=6
 
 # Optional WhatsApp delivery
 TWILIO_ACCOUNT_SID=...
@@ -278,10 +273,25 @@ MUNIM_TEST_RECIPIENT=+91...
 CRON_SECRET=replace-with-a-random-cron-secret
 ```
 
+`SARVAM_API_KEY` is the only Sarvam credential a deployment needs. It
+authenticates the REST APIs (speech, TTS, chat, document parsing) and the
+Samvaad app runtime alike.
+
+`SAMVAAD_WEBHOOK_SECRET` is **not** issued by Sarvam. It is a value you choose,
+set here, and paste into the Samvaad agent console as `agent_secret`. Samvaad's
+cloud calls the shop tools from outside your session, so `/api/agent/` is a
+public prefix and this secret is what authenticates those calls. Voice tools
+will not work without it.
+
 Everything below is optional; each has a working default.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
+| `SAMVAAD_API_KEY` | `SARVAM_API_KEY` | Only for deployments issued a separate Samvaad key. A blank or placeholder value falls back rather than failing upstream. |
+| `SAMVAAD_ORG_ID` | committed default | Sarvam org that owns the agent. |
+| `SAMVAAD_WORKSPACE_ID` | committed default | Sarvam workspace that owns the agent. |
+| `SAMVAAD_APP_ID` | committed default | Samvaad app to open sessions against. |
+| `SAMVAAD_AGENT_VERSION` | `6` | Pins the agent version a browser session may request. |
 | `MUNIM_TZ` | `Asia/Kolkata` | Timezone used for "today", summaries, and due dates. |
 | `MUNIM_TODAY` | real date | Pins the date (`YYYY-MM-DD`) for demos and deterministic tests. |
 | `MUNIM_DATA_DIR` | `data/` | File-store location when `DATABASE_URL` is unset. |
