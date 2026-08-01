@@ -14,6 +14,7 @@ import os
 import re
 import secrets
 import sys
+import tempfile
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -1294,9 +1295,12 @@ async def invoice(file: UploadFile = File(None)):
         try:
             data = await file.read()
             suffix = Path(file.filename or "invoice.png").suffix or ".png"
-            tmp = ROOT / "debug" / f"uploaded_invoice{suffix}"
-            tmp.write_bytes(data)
-            parsed = sarvam_client.parse_document(str(tmp))
+            # A serverless bundle is read-only apart from the system temp dir,
+            # so the upload cannot be staged next to the code.
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp = Path(tmpdir) / f"uploaded_invoice{suffix}"
+                tmp.write_bytes(data)
+                parsed = sarvam_client.parse_document(str(tmp))
             lines = _lines_from_markdown(parsed.get("markdown", ""))
             used_fixture = not bool(lines)
         except Exception as e:
