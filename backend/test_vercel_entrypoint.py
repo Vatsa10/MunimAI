@@ -1,6 +1,7 @@
 """Regression checks for the native Vercel FastAPI entry point."""
 import importlib.util
 import json
+import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -9,6 +10,12 @@ from fastapi.testclient import TestClient
 
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# app.py imports ``backend.main``, which resolves only with the repository root
+# on the path. Vercel runs the function from the root, but a test invoked from
+# backend/ does not, so put it there rather than depend on the caller's cwd.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 class VercelEntrypointTests(unittest.TestCase):

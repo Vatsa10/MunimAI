@@ -55,7 +55,8 @@ TIMEOUT = 20  # seconds, per spec
 # owner. Cap our own timeout below that ceiling so a slow model call fails as
 # a normal, handled error instead. Unset locally, where a long-running uvicorn
 # has no such limit.
-MAX_TIMEOUT = float(os.environ.get("SARVAM_MAX_TIMEOUT") or 0) or None
+MAX_TIMEOUT = (float(os.environ.get("SARVAM_MAX_TIMEOUT") or 0)
+               or (50.0 if os.environ.get("VERCEL") else None))
 MAX_RETRIES = 3
 
 
