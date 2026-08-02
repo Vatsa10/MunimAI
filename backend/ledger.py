@@ -18,8 +18,14 @@ from typing import Optional, Union
 UNCOUNTED = "UNCOUNTED"  # sentinel — MUST never render as 0
 
 # within-a-day application order (spec Section 3)
+# A same-day return must apply after the sale it reverses. credit_note and
+# debit_note are money-only: they get ranks so sorting stays deterministic, but
+# deliberately get no branch in the replay loop, which is what keeps them
+# stock-neutral.
 _TYPE_ORDER = {"opening_balance": 0, "stock_take": 0, "delivery": 1,
-               "sale": 2, "adjustment": 3}
+               "sale": 2, "sales_return": 3, "credit_note": 4,
+               "debit_note": 4, "adjustment": 5}
+_UNKNOWN_TYPE_RANK = 9  # must stay above every known rank
 
 
 def _d(s: str) -> date:
@@ -87,7 +93,8 @@ def compute_confidence(base_conf: float, occurred_on: str, recorded_at: str,
 # ---------------------------------------------------------------------------
 def _sorted_events(events: list) -> list:
     return sorted(events, key=lambda e: (_d(e["occurred_on"]),
-                                         _TYPE_ORDER.get(e["type"], 5)))
+                                         _TYPE_ORDER.get(e["type"],
+                                                         _UNKNOWN_TYPE_RANK)))
 
 
 def stock_at(sku: dict, events: list, as_of: Optional[date] = None) -> Union[float, str]:
@@ -119,6 +126,8 @@ def _stock_detail(sku: dict, events: list, as_of: Optional[date] = None) -> dict
             qty_base += q
         elif t == "sale":
             qty_base -= q
+        elif t == "sales_return":
+            qty_base += q
         elif t == "adjustment":
             qty_base += q  # signed
     if not baseline_set:
