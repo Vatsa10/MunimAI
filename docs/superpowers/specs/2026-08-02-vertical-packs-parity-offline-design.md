@@ -63,11 +63,15 @@ by construction.
 and incrementing. An offline client cannot know the next number, and the
 read-then-write is racy under concurrent writes.
 
-The foundation changes event insertion to **accept a caller-supplied
-`event_id`** and fall back to the existing sequence only when absent. Offline
-clients supply a ULID. The existing `UNIQUE (user_id, event_id)` constraint then
-*is* the idempotency guarantee — a replayed outbox cannot double-post a sale, so
-no new dedupe column is required.
+Verified against the codebase: `sqlrepo.py` **already** accepts a caller-supplied
+`event_id` and only mints `evt_NNNN` when one is absent. Offline clients can
+therefore supply a ULID with no change to the insert path.
+
+The real gap is idempotency. The insert has no conflict handling, so a replayed
+outbox raises a unique-constraint violation rather than being a safe no-op. The
+foundation adds `ON CONFLICT (user_id, event_id) DO NOTHING`, which turns the
+existing `UNIQUE (user_id, event_id)` constraint into the idempotency guarantee.
+No new dedupe column is required.
 
 ### 2.4 Sync ordering column
 
