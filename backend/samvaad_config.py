@@ -299,6 +299,22 @@ nahi likhi", taaki maalik ko pata rahe ki kya hua aur kya nahi.
 """
 
 
+def build_prompt(vertical_id: str | None = None, version: str | None = None) -> str:
+    """Compose the base Samvaad prompt with a vertical pack's fragment.
+
+    The 27-tool registry (agent.TOOLS) is never touched here - only the text
+    instructions change, per spec section 3.5.
+    """
+    if not vertical_id or not version:
+        return INSTRUCTIONS
+    import verticals
+    try:
+        pack = verticals.load_pack(vertical_id, version)
+    except verticals.PackValidationError:
+        return INSTRUCTIONS
+    return INSTRUCTIONS + "\n\n" + pack["prompt_fragment"]
+
+
 # args the agent fills in per tool, and a trimmed real reply. Both matter: the
 # console's Body tab needs the arg shape, and seeing the reply is what stops an
 # agent inventing a field name that never existed.
