@@ -408,9 +408,8 @@ class JsonRepo(Repo):
         """A customer's default price-list tier (retail/contractor/dealer).
 
         Stored as a plain extra field on the customer row rather than a new
-        JSON file — one JSONB-shaped bag would be the Postgres equivalent,
-        but sqlrepo.py is frozen, so this stays a JsonRepo-only capability;
-        see B3 in the parity-pack plan for the tradeoff.
+        JSON file. SqlRepo mirrors this with a `price_tier` column on
+        `customers`.
         """
         def _set(customers):
             row = next((c for c in customers

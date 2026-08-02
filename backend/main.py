@@ -1742,11 +1742,10 @@ def set_customer_price_tier(customer_id: str, payload: dict = Body(...)):
         return Response(status_code=400,
                         content='{"error":"tier must be retail, contractor or dealer"}',
                         media_type="application/json")
-    if not hasattr(repo, "set_customer_price_tier"):
-        return Response(status_code=501,
-                        content='{"error":"price tiers are not available on this backend"}',
-                        media_type="application/json")
-    return repo.set_customer_price_tier(customer_id, tier)
+    try:
+        return repo.set_customer_price_tier(customer_id, tier)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
 
 
 # ---------------------------------------------------------------------------

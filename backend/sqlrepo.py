@@ -405,6 +405,13 @@ class SqlRepo:
                 cfg["gst_default"] = patch["gst_default"]
             if "gst_by_family" in patch:
                 cfg.setdefault("gst_by_family", {}).update(patch["gst_by_family"])
+            # vertical_id/vertical_pack_version: shipped-pack pointer written by
+            # verticals.seed_tenant(), same pass-through treatment as gst_default
+            # above rather than the Settings-page whitelist below.
+            if "vertical_id" in patch:
+                cfg["vertical_id"] = patch["vertical_id"]
+            if "vertical_pack_version" in patch:
+                cfg["vertical_pack_version"] = patch["vertical_pack_version"]
             for key in self._SETTING_KEYS:
                 if key in patch:
                     cfg[key] = patch[key]
@@ -437,8 +444,9 @@ class SqlRepo:
     def _load_customers(self) -> list:
         with db.connect() as conn:
             cur = conn.execute(
-                "SELECT customer_id, phone, name, created_at, updated_at"
-                " FROM customers WHERE user_id = %s ORDER BY customer_id",
+                "SELECT customer_id, phone, name, created_at, updated_at,"
+                " price_tier FROM customers WHERE user_id = %s"
+                " ORDER BY customer_id",
                 (self.user_id,))
             return [_clean_row(r) for r in db.rows_to_dicts(cur)]
 
@@ -524,6 +532,21 @@ class SqlRepo:
             removed = cur.rowcount > 0
         self._invalidate("customers")
         return removed
+
+    def set_customer_price_tier(self, customer_id: str, tier: str) -> dict:
+        """A customer's default price-list tier (retail/contractor/dealer)."""
+        with db.connect() as conn:
+            existing = conn.execute(
+                "SELECT 1 FROM customers WHERE user_id = %s"
+                " AND customer_id = %s", (self.user_id, customer_id)).fetchone()
+            if not existing:
+                raise ValueError("customer not found")
+            conn.execute(
+                "UPDATE customers SET price_tier = %s"
+                " WHERE user_id = %s AND customer_id = %s",
+                (tier, self.user_id, customer_id))
+        self._invalidate("customers")
+        return self.customer(customer_id)
 
     def _load_receivables(self) -> list:
         with db.connect() as conn:

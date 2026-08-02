@@ -130,40 +130,12 @@ def load_pack(vertical_id: str, version: str) -> dict:
 def _stamp_vertical_config(repo, vertical_id: str, version: str) -> None:
     """Record vertical_id/vertical_pack_version in the tenant's own config.
 
-    JsonRepo (used by the whole test suite) goes through the ordinary
-    repo.save_config() -> repo.py is not on the do-not-modify list, so it was
-    taught to pass these two keys through, the same way it already
-    special-cases gst_default.
-
-    SqlRepo (the live Postgres path) is on the do-not-modify list, so this
-    writes user_config directly with the identical
-    "SELECT ... FOR UPDATE" / "INSERT ... ON CONFLICT" pattern sqlrepo.py's
-    own save_config already uses for the same table - no schema change, no
-    edit to sqlrepo.py, just a second writer using the table it already owns.
-
-    ponytail: this raw-SQL branch is a constraint-driven workaround, not a
-    design choice - it exists only because sqlrepo.py was frozen for the
-    parallel A/B/C build. Once that build merges, fold vertical_id/
-    vertical_pack_version into SqlRepo.save_config()'s own key list (same
-    treatment as gst_default) and delete this branch; a second writer against
-    a table SqlRepo already owns should not be permanent architecture.
+    Both JsonRepo and SqlRepo pass vertical_id/vertical_pack_version through
+    save_config() the same way they already special-case gst_default, so this
+    just goes through the ordinary repo.save_config() interface.
     """
-    user_id = getattr(repo, "user_id", None)
-    if user_id is None:
-        cfg = repo.load_config()
-        repo.save_config(set_tenant_vertical(cfg, vertical_id, version))
-        return
-    import db
-    with db.connect() as conn:
-        row = conn.execute(
-            "SELECT data FROM user_config WHERE user_id = %s FOR UPDATE",
-            (user_id,)).fetchone()
-        cfg = (row[0] if row else None) or {"gst_default": 18, "gst_by_family": {}}
-        cfg = set_tenant_vertical(cfg, vertical_id, version)
-        conn.execute(
-            "INSERT INTO user_config (user_id, data) VALUES (%s,%s::jsonb)"
-            " ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data",
-            (user_id, json.dumps(cfg, ensure_ascii=False)))
+    cfg = repo.load_config()
+    repo.save_config(set_tenant_vertical(cfg, vertical_id, version))
     if hasattr(repo, "refresh"):
         repo.refresh()
 
