@@ -2591,6 +2591,8 @@
   <button class="tab-btn" data-tab="stock" onclick="showTab('stock')"><span class="material-symbols-outlined">inventory_2</span><span data-mobile-label="Stock">Inventory</span></button>
   <button class="tab-btn" data-tab="customers" onclick="showTab('customers')"><span class="material-symbols-outlined">group</span><span data-mobile-label="People">Customers</span></button>
   <button class="tab-btn" data-tab="today" onclick="showTab('today')"><span class="material-symbols-outlined">calendar_today</span><span data-mobile-label="Today">Today</span></button>
+  <button class="tab-btn" data-tab="documents" onclick="showTab('documents')"><span class="material-symbols-outlined">description</span><span data-mobile-label="Docs">Documents</span></button>
+  <button class="tab-btn" data-tab="accounting" onclick="showTab('accounting')"><span class="material-symbols-outlined">account_balance</span><span data-mobile-label="Books">Accounting</span></button>
   <div class="nav-footer">
     <button class="tab-btn" data-tab="settings" onclick="showTab('settings')"><span class="material-symbols-outlined">settings</span><span>Settings</span></button>
     <button onclick="logout()" id="logoutBtn"><span class="material-symbols-outlined">logout</span><span>Logout</span></button>
@@ -2765,6 +2767,113 @@
       <audio id="todayAudio" class="hidden"></audio>
     </div>
   </section>
+
+  <!-- @section:documents -->
+  <!-- DOCUMENTS: delivery challan, quotation, proforma invoice, purchase order -->
+  <section id="tab-documents" class="tabpane workspace-page hidden">
+    <div class="page-heading">
+      <div>
+        <div class="eyebrow">Paperwork</div>
+        <h1>Documents</h1>
+        <p>Generate a delivery challan, quotation, proforma invoice or purchase order and share the link.</p>
+      </div>
+    </div>
+    <div class="card">
+      <div id="docForm"></div>
+    </div>
+    <div id="docResult"></div>
+  </section>
+  <!-- @endsection:documents -->
+
+  <!-- @section:accounting -->
+  <!-- ACCOUNTING: catalogue import, price tiers, returns/notes, tally export -->
+  <section id="tab-accounting" class="tabpane workspace-page hidden">
+    <div class="page-heading">
+      <div>
+        <div class="eyebrow">Back office</div>
+        <h1>Accounting</h1>
+        <p>Bulk catalogue import, customer price tiers, sales returns, credit/debit notes and the Tally export.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="invoice-intro">
+        <div>
+          <div class="invoice-step">Catalogue import</div>
+          <h2>Upload a CSV/XLSX price list.</h2>
+          <p>Always previewed first — nothing is written until you review created-vs-updated rows and press Commit.</p>
+        </div>
+        <span class="dashboard-section-icon"><span class="material-symbols-outlined">upload_file</span></span>
+      </div>
+      <div class="invoice-upload-zone">
+        <div class="invoice-upload-controls">
+          <input type="file" id="catalogueImportFile" accept=".csv,.xlsx,.xlsm" class="rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm" onchange="resetCatalogueImportPreview()">
+          <button onclick="previewCatalogueImport()" class="btn-primary px-4 py-2.5">
+            <span class="material-symbols-outlined align-middle text-[18px]">preview</span>
+            Preview import
+          </button>
+          <button id="catalogueImportCommitBtn" onclick="commitCatalogueImport()" class="btn-secondary px-4 py-2.5" disabled>
+            <span class="material-symbols-outlined align-middle text-[18px]">check_circle</span>
+            Commit import
+          </button>
+        </div>
+      </div>
+      <div id="catalogueImportResult"></div>
+    </div>
+
+    <div class="card">
+      <div class="invoice-intro">
+        <div>
+          <div class="invoice-step">Price tiers</div>
+          <h2>Set a customer's default price tier.</h2>
+          <p>Per-SKU retail/contractor/dealer rates come from the catalogue import columns above (price_retail, price_contractor, price_dealer).</p>
+        </div>
+        <span class="dashboard-section-icon"><span class="material-symbols-outlined">sell</span></span>
+      </div>
+      <div class="invoice-upload-controls">
+        <select id="tierCustomerSelect" class="rounded-xl border border-slate-200 px-2 py-2 text-sm"></select>
+        <select id="tierSelect" class="rounded-xl border border-slate-200 px-2 py-2 text-sm">
+          <option value="retail">Retail</option>
+          <option value="contractor">Contractor</option>
+          <option value="dealer">Dealer</option>
+        </select>
+        <button id="tierSaveBtn" onclick="saveCustomerTier()" class="btn-primary px-4 py-2.5">Save tier</button>
+      </div>
+      <div id="tierResult"></div>
+    </div>
+
+    <div class="card">
+      <div class="invoice-intro">
+        <div>
+          <div class="invoice-step">Returns &amp; notes</div>
+          <h2>Sales return, credit note, debit note.</h2>
+          <p>Same item lines as a sale; sales returns restore stock, notes stay stock-neutral.</p>
+        </div>
+        <span class="dashboard-section-icon"><span class="material-symbols-outlined">assignment_return</span></span>
+      </div>
+      <div id="acctForm"></div>
+    </div>
+
+    <div class="card">
+      <div class="invoice-intro">
+        <div>
+          <div class="invoice-step">Tally / Busy export</div>
+          <h2>Download ledger XML for a date range.</h2>
+          <p>All events and payments in the range, ready to import into Tally or Busy.</p>
+        </div>
+        <span class="dashboard-section-icon"><span class="material-symbols-outlined">file_download</span></span>
+      </div>
+      <div class="invoice-upload-controls">
+        <input id="tallyStart" type="date" class="rounded-xl border border-slate-200 px-2 py-2 text-sm">
+        <input id="tallyEnd" type="date" class="rounded-xl border border-slate-200 px-2 py-2 text-sm">
+        <button onclick="downloadTallyExport()" class="btn-primary px-4 py-2.5">
+          <span class="material-symbols-outlined align-middle text-[18px]">download</span>
+          Export XML
+        </button>
+      </div>
+    </div>
+  </section>
+  <!-- @endsection:accounting -->
 
   <!-- DASHBOARD -->
   <section id="tab-dashboard" class="tabpane dashboard-page">
@@ -2998,6 +3107,10 @@
 const GATES = {live_sale:0.80, delivery:0.92, recall:0.88, count:0.92, stock_take:0.92};
 let STATE = {catalogue:[], byId:{}, today:'2026-07-26'};
 let PENDING = {}; // per-tab pending resolution
+// B4 — role gate for the UI only; the server re-checks every mutating call
+// (permissions.py), so this just hides/disables what a role cannot use.
+let ROLE = 'owner';
+function canWrite(){ return ROLE==='owner'||ROLE==='manager'; }
 
 function toast(msg, ok=true){ const t=document.getElementById('toast'); t.textContent=msg;
   t.className='fixed bottom-5 left-1/2 -translate-x-1/2 px-5 py-3 rounded-xl font-semibold z-50 '+(ok?'bg-emerald-700':'bg-rose-700');
@@ -3062,7 +3175,8 @@ function showTab(t){
   document.getElementById('tab-'+t).classList.remove('hidden');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
   if(t==='today') loadToday(); if(t==='dashboard') loadDashboard(); if(t==='stock') loadStock();
-  if(t==='customers') loadCustomers(); if(t==='settings') loadSettings(); }
+  if(t==='customers') loadCustomers(); if(t==='settings') loadSettings();
+  if(t==='documents') initDocumentsTab(); if(t==='accounting') initAccountingTab(); }
 
 function closeMobileAccountMenu(){
   const panel=document.getElementById('mobileAccountPanel');
@@ -4836,6 +4950,196 @@ async function submitOnboarding(){
   finally{ btn.disabled=false; }
 }
 
+// ================= DOCUMENTS (challan / quotation / proforma / PO) =================
+const DOC_TYPES = {
+  challan: {label:'Delivery challan', endpoint:'/api/documents/challan', party:'customer', priced:false},
+  quotation: {label:'Quotation', endpoint:'/api/documents/quotation', party:'customer', priced:true},
+  proforma: {label:'Proforma invoice', endpoint:'/api/documents/proforma', party:'customer', priced:true},
+  purchase_order: {label:'Purchase order', endpoint:'/api/documents/purchase-order', party:'supplier', priced:true},
+};
+let DOC_ITEMS = [{sku_id:'', qty:1, rate:0}];
+let DOC_TYPE = 'challan';
+function initDocumentsTab(){ renderDocForm(); }
+function docSkuOptions(sel){
+  return '<option value="">Select item…</option>'+STATE.catalogue.map(s=>
+    `<option value="${s.sku_id}" ${s.sku_id===sel?'selected':''}>${escHtml(s.canonical)}</option>`).join('');
+}
+function renderDocForm(){
+  const cfg = DOC_TYPES[DOC_TYPE];
+  const partyLabel = cfg.party==='supplier' ? 'Supplier' : 'Customer';
+  const rows = DOC_ITEMS.map((it,i)=>`<div class="flex gap-2 items-center mb-2">
+    <select onchange="DOC_ITEMS[${i}].sku_id=this.value" class="rounded-xl border border-slate-200 px-2 py-2 text-sm flex-1">${docSkuOptions(it.sku_id)}</select>
+    <input type="number" min="0.01" step="0.01" value="${it.qty}" placeholder="Qty" oninput="DOC_ITEMS[${i}].qty=Number(this.value)" class="rounded-xl border border-slate-200 px-2 py-2 text-sm w-24">
+    ${cfg.priced?`<input type="number" min="0" step="0.01" value="${it.rate}" placeholder="Rate" oninput="DOC_ITEMS[${i}].rate=Number(this.value)" class="rounded-xl border border-slate-200 px-2 py-2 text-sm w-24">`:''}
+    <button onclick="removeDocItem(${i})" class="btn-secondary px-3 py-2">✕</button>
+  </div>`).join('');
+  document.getElementById('docForm').innerHTML = `
+    <div class="invoice-upload-controls mb-3">
+      <select id="docTypeSelect" onchange="DOC_TYPE=this.value; renderDocForm();" class="rounded-xl border border-slate-200 px-2 py-2 text-sm">
+        ${Object.entries(DOC_TYPES).map(([k,v])=>`<option value="${k}" ${k===DOC_TYPE?'selected':''}>${v.label}</option>`).join('')}
+      </select>
+    </div>
+    <div class="flex gap-2 mb-3">
+      <input id="docPartyName" type="text" placeholder="${partyLabel} name" class="rounded-xl border border-slate-200 px-2 py-2 text-sm flex-1">
+      <input id="docPartyPhone" type="tel" placeholder="${partyLabel} phone (optional)" class="rounded-xl border border-slate-200 px-2 py-2 text-sm flex-1">
+    </div>
+    <div id="docItemRows">${rows}</div>
+    <div class="flex gap-2 mt-2">
+      <button onclick="addDocItem()" class="btn-secondary px-3 py-2">+ Add item</button>
+      <button onclick="submitDocument()" class="btn-primary px-4 py-2.5">Generate document</button>
+    </div>`;
+}
+function addDocItem(){ DOC_ITEMS.push({sku_id:'', qty:1, rate:0}); renderDocForm(); }
+function removeDocItem(i){ DOC_ITEMS.splice(i,1); if(!DOC_ITEMS.length) DOC_ITEMS.push({sku_id:'', qty:1, rate:0}); renderDocForm(); }
+async function submitDocument(){
+  const cfg = DOC_TYPES[DOC_TYPE];
+  const items = DOC_ITEMS.filter(i=>i.sku_id && i.qty>0);
+  if(!items.length){ toast('Kam se kam ek item chahiye',false); return; }
+  const name = document.getElementById('docPartyName').value.trim();
+  const phone = document.getElementById('docPartyPhone').value.trim();
+  const party = {name, phone};
+  const payload = {items};
+  payload[cfg.party] = party;
+  try{
+    const doc = await api(cfg.endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    document.getElementById('docResult').innerHTML = `<div class="card mt-4">
+      <div class="font-semibold mb-2">${cfg.label} generated</div>
+      <div class="flex gap-2 items-center">
+        <input readonly value="${escHtml(doc.url||'')}" class="rounded-xl border border-slate-200 px-2 py-2 text-sm flex-1" onclick="this.select()">
+        <a class="btn-primary px-4 py-2.5" href="${escHtml(doc.url||'#')}" target="_blank" rel="noopener">Open</a>
+      </div></div>`;
+    toast(cfg.label+' ready');
+  }catch(e){ toast(e.message||'Document nahi bana',false); }
+}
+
+// ================= ACCOUNTING (catalogue import, price tiers, returns/notes, tally) =================
+let CATALOGUE_IMPORT_PREVIEWED = false;
+function resetCatalogueImportPreview(){
+  CATALOGUE_IMPORT_PREVIEWED = false;
+  document.getElementById('catalogueImportCommitBtn').disabled = true;
+  document.getElementById('catalogueImportResult').innerHTML = '';
+}
+async function previewCatalogueImport(){
+  const file = document.getElementById('catalogueImportFile').files[0];
+  if(!file){ toast('File chuniye',false); return; }
+  const fd = new FormData(); fd.append('file', file);
+  try{
+    const out = await api('/api/catalogue/import/preview', {method:'POST', body:fd});
+    CATALOGUE_IMPORT_PREVIEWED = true;
+    document.getElementById('catalogueImportCommitBtn').disabled = !canWrite();
+    const errRows = (out.errors||[]).map(e=>`<tr><td>${e.row}</td><td class="text-rose-700">${escHtml(e.error)}</td></tr>`).join('');
+    document.getElementById('catalogueImportResult').innerHTML = `<div class="mt-3">
+      <div class="mb-2 text-sm">${out.total_rows} rows parsed · <b>${(out.to_create||[]).length} to create</b> · <b>${(out.to_update||[]).length} to update</b>${(out.errors||[]).length?` · <span class="text-rose-700">${out.errors.length} errors</span>`:''}</div>
+      <div class="ledger-table-wrap"><table class="ledger-table"><thead><tr><th>SKU</th><th>Product</th><th>Action</th></tr></thead><tbody>
+      ${(out.to_create||[]).map(r=>`<tr><td>${escHtml(r.sku_id)}</td><td>${escHtml(r.canonical)}</td><td><span class="stock-status stable">Create</span></td></tr>`).join('')}
+      ${(out.to_update||[]).map(r=>`<tr><td>${escHtml(r.sku_id)}</td><td>${escHtml(r.canonical)}</td><td><span class="stock-status uncounted">Update</span></td></tr>`).join('')}
+      </tbody></table></div>
+      ${errRows?`<div class="ledger-table-wrap mt-3"><table class="ledger-table"><thead><tr><th>Row</th><th>Error</th></tr></thead><tbody>${errRows}</tbody></table></div>`:''}
+    </div>`;
+    toast('Preview ready — review before committing');
+  }catch(e){ toast(e.message||'Preview nahi ban saka',false); }
+}
+async function commitCatalogueImport(){
+  if(!CATALOGUE_IMPORT_PREVIEWED){ toast('Pehle preview dekhiye',false); return; }
+  const file = document.getElementById('catalogueImportFile').files[0];
+  if(!file){ toast('File chuniye',false); return; }
+  if(!confirm('This will write '+(document.getElementById('catalogueImportFile').files[0].name)+' into your catalogue. Continue?')) return;
+  const fd = new FormData(); fd.append('file', file);
+  try{
+    const out = await api('/api/catalogue/import/commit', {method:'POST', body:fd});
+    toast(`Import done: ${(out.created||[]).length} created, ${(out.updated||[]).length} updated`);
+    resetCatalogueImportPreview();
+    const s = await api('/api/state'); STATE.catalogue = s.catalogue; STATE.byId = {}; s.catalogue.forEach(x=>STATE.byId[x.sku_id]=x);
+  }catch(e){ toast(e.message||'Import commit nahi hua',false); }
+}
+
+async function initAccountingTab(){
+  const tierBtn = document.getElementById('tierSaveBtn');
+  if(!canWrite()){
+    document.getElementById('catalogueImportCommitBtn').disabled = true;
+    document.getElementById('catalogueImportCommitBtn').title = 'Your role cannot write to the catalogue';
+    tierBtn.disabled = true; tierBtn.title = 'Your role cannot edit price tiers';
+  }
+  try{
+    const r = await api('/api/customers');
+    const sel = document.getElementById('tierCustomerSelect');
+    sel.innerHTML = (r.customers||[]).map(c=>`<option value="${c.customer_id}">${escHtml(c.name||c.phone)}</option>`).join('') || '<option value="">No customers</option>';
+  }catch(e){}
+  renderAcctForm();
+}
+const ACCT_TYPES = {
+  sales_return: {label:'Sales return', endpoint:'/api/accounting/sales-return'},
+  credit_note: {label:'Credit note', endpoint:'/api/accounting/credit-note'},
+  debit_note: {label:'Debit note', endpoint:'/api/accounting/debit-note'},
+};
+let ACCT_TYPE = 'sales_return';
+let ACCT_ITEMS = [{sku_id:'', qty:1}];
+function renderAcctForm(){
+  const rows = ACCT_ITEMS.map((it,i)=>`<div class="flex gap-2 items-center mb-2">
+    <select onchange="ACCT_ITEMS[${i}].sku_id=this.value" class="rounded-xl border border-slate-200 px-2 py-2 text-sm flex-1">${docSkuOptions(it.sku_id)}</select>
+    <input type="number" min="0.01" step="0.01" value="${it.qty}" placeholder="Qty" oninput="ACCT_ITEMS[${i}].qty=Number(this.value)" class="rounded-xl border border-slate-200 px-2 py-2 text-sm w-24">
+    <button onclick="removeAcctItem(${i})" class="btn-secondary px-3 py-2">✕</button>
+  </div>`).join('');
+  document.getElementById('acctForm').innerHTML = `
+    <div class="invoice-upload-controls mb-3">
+      <select id="acctTypeSelect" onchange="ACCT_TYPE=this.value; renderAcctForm();" class="rounded-xl border border-slate-200 px-2 py-2 text-sm">
+        ${Object.entries(ACCT_TYPES).map(([k,v])=>`<option value="${k}" ${k===ACCT_TYPE?'selected':''}>${v.label}</option>`).join('')}
+      </select>
+      <input id="acctDate" type="date" value="${STATE.today}" class="rounded-xl border border-slate-200 px-2 py-2 text-sm">
+    </div>
+    <div id="acctItemRows">${rows}</div>
+    <div class="flex gap-2 mt-2">
+      <button onclick="addAcctItem()" class="btn-secondary px-3 py-2">+ Add item</button>
+      <button onclick="submitAcctEvent()" class="btn-primary px-4 py-2.5" ${canWrite()?'':'disabled title="Your role cannot post accounting entries"'}>Record entry</button>
+    </div>
+    <div id="acctResult"></div>`;
+}
+function addAcctItem(){ ACCT_ITEMS.push({sku_id:'', qty:1}); renderAcctForm(); }
+function removeAcctItem(i){ ACCT_ITEMS.splice(i,1); if(!ACCT_ITEMS.length) ACCT_ITEMS.push({sku_id:'', qty:1}); renderAcctForm(); }
+async function submitAcctEvent(){
+  const cfg = ACCT_TYPES[ACCT_TYPE];
+  const items = ACCT_ITEMS.filter(i=>i.sku_id && i.qty>0);
+  if(!items.length){ toast('Kam se kam ek item chahiye',false); return; }
+  if(!confirm(`Record this ${cfg.label.toLowerCase()}? This cannot be undone from here.`)) return;
+  const occurred_on = document.getElementById('acctDate').value || STATE.today;
+  try{
+    await api(cfg.endpoint, {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({items, occurred_on})});
+    toast(cfg.label+' recorded');
+    ACCT_ITEMS = [{sku_id:'', qty:1}]; renderAcctForm();
+  }catch(e){ toast(e.message||'Entry record nahi hui',false); }
+}
+async function saveCustomerTier(){
+  const customerId = document.getElementById('tierCustomerSelect').value;
+  const tier = document.getElementById('tierSelect').value;
+  if(!customerId){ toast('Customer chuniye',false); return; }
+  try{
+    await api('/api/customers/'+encodeURIComponent(customerId)+'/price-tier', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({tier})});
+    document.getElementById('tierResult').innerHTML = `<div class="text-sm text-emerald-700 mt-2">Tier saved.</div>`;
+    toast('Price tier saved');
+  }catch(e){
+    document.getElementById('tierResult').innerHTML = `<div class="text-sm text-rose-700 mt-2">${escHtml(e.message||'Tier save failed')}</div>`;
+    toast(e.message||'Tier save nahi hua',false);
+  }
+}
+async function downloadTallyExport(){
+  const start = document.getElementById('tallyStart').value;
+  const end = document.getElementById('tallyEnd').value;
+  if(!start || !end){ toast('Start aur end date chuniye',false); return; }
+  try{
+    const tok = getToken();
+    const r = await fetch(`/api/accounting/tally-export?start=${start}&end=${end}`,
+      {headers: tok?{Authorization:'Bearer '+tok}:{}});
+    if(!r.ok){ const d = await responseJson(r); throw new Error(d.detail||'Export failed'); }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `tally-export-${start}-to-${end}.xml`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast('Tally export downloaded');
+  }catch(e){ toast(e.message||'Export nahi hua',false); }
+}
+
 // Decide on load: a stored token means straight into the app, so the
 // shopkeeper stays signed in across reloads until they press Logout.
 async function start(){
@@ -4843,6 +5147,7 @@ async function start(){
   try{
     const me=await api('/api/me');
     if(me.onboarded===false){ startOnboarding(); return; }
+    ROLE=me.role||'owner';
     hideAuth(); await boot();
   }catch(e){ showAuth('authStepLogin'); }
 }
@@ -4853,14 +5158,6 @@ start();
 <!-- Regions owned exclusively by one parallel sub-project. Insert only between
      a marker and its @endsection counterpart; backend/test_ledger_contract.py
      asserts these fences exist. -->
-
-<!-- @section:documents -->
-<!-- Sub-project B: challan, quotation, proforma, purchase order. -->
-<!-- @endsection:documents -->
-
-<!-- @section:accounting -->
-<!-- Sub-project B: credit notes, debit notes, returns, price lists, roles. -->
-<!-- @endsection:accounting -->
 
 <!-- @section:offline -->
 <!-- Sub-project C: service worker, IndexedDB outbox, offline state.
