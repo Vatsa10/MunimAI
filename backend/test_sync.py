@@ -267,6 +267,58 @@ class ConflictResolutionTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
 
 
+class ConcurrentOutboxTests(unittest.TestCase):
+    """/api/sync/outbox passes `main.repo` — a module-level singleton — into
+    apply_outbox, and `sync_outbox` is a sync `def`, so FastAPI runs
+    concurrent requests against it in a threadpool. Nothing in the write
+    pipeline may mutate that shared object for the duration of one call, or
+    one tenant's request can stamp its identity onto another tenant's event
+    (and `del repo.append_event` in a finally block can race another
+    thread's own delete). This reproduces that path directly with real
+    threads instead of going through TestClient, so a slow-but-real race
+    window is exercised rather than one thread completing before the next
+    starts."""
+
+    def test_concurrent_outbox_calls_do_not_cross_contaminate_event_ids(self):
+        import threading
+
+        rounds = 25
+        errors = []
+
+        for _ in range(rounds):
+            with tempfile.TemporaryDirectory() as tmp_a, \
+                 tempfile.TemporaryDirectory() as tmp_b:
+                repo_a = _repo(tmp_a)
+                repo_b = _repo(tmp_b)
+                barrier = threading.Barrier(2)
+
+                def _run(target_repo, eid):
+                    token = main._CURRENT.set(target_repo)
+                    try:
+                        barrier.wait(timeout=5)
+                        sync.apply_outbox(
+                            main.repo, [_ev(eid, "opening_balance", 100)])
+                    except Exception as e:  # pragma: no cover - surfaced below
+                        errors.append(e)
+                    finally:
+                        main._CURRENT.reset(token)
+
+                t1 = threading.Thread(target=_run, args=(repo_a, "ulid_a"))
+                t2 = threading.Thread(target=_run, args=(repo_b, "ulid_b"))
+                t1.start()
+                t2.start()
+                t1.join()
+                t2.join()
+
+                self.assertEqual(errors, [])
+                ids_a = {e["event_id"] for e in repo_a.all_events()}
+                ids_b = {e["event_id"] for e in repo_b.all_events()}
+                self.assertEqual(ids_a, {"ulid_a"},
+                                 "shop A's event lost/gained an id under concurrency")
+                self.assertEqual(ids_b, {"ulid_b"},
+                                 "shop B's event lost/gained an id under concurrency")
+
+
 USER = {"user_id": "u_offline", "phone": "+919999999998", "name": "Owner",
         "shop_name": "Offline Traders"}
 

@@ -135,44 +135,29 @@ def _write_through_pipeline(repo, ev: dict, eid: str, seq: int) -> None:
     a top-level `import main` would otherwise hit.
 
     `main._write_events` reads/writes through the module-level `repo` proxy,
-    not a parameter, so the proxy's ContextVar is pointed at the caller's repo
-    for the duration of the call (the same mechanism test_sync.py's
-    `_signed_in` helper uses for the HTTP-route tests).
+    not a parameter, so when the caller's repo is not that proxy (the unit
+    tests call `apply_outbox` directly against a JsonRepo) the proxy's
+    ContextVar is pointed at it for the duration of the call — the same
+    mechanism test_sync.py's `_signed_in` helper uses for the HTTP-route
+    tests. `main.repo` is a module-level singleton shared by every concurrent
+    request (`sync_outbox` is a sync `def`, so FastAPI runs it in a
+    threadpool), so nothing here may mutate that shared object: no monkey-
+    patching `repo.append_event`. `ContextVar.set`/`.reset` is per-context and
+    thread-safe, which is exactly why it, and only it, is safe to use.
 
-    `_write_events` never copies a caller-supplied event_id onto the event it
-    builds — it always mints a fresh one via `repo.append_event`. Left alone
-    that would silently drop the client's ULID and break the outbox's
-    idempotency guarantee on resend, so `repo.append_event` is wrapped for the
-    duration of this call to stamp the client's event_id (and our sync seq)
-    onto the event before it is persisted.
+    `_write_events` now honours a caller-supplied `event_id`/`occurred_at`/
+    `seq` on the item dict instead of always minting its own (main.py), so
+    the client's ULID and the sync-assigned seq are passed straight through
+    on the item rather than injected via a wrapper.
     """
     import main
 
-    # `repo` here may already BE `main.repo` (the request-scoped proxy, as it
-    # is when this runs through the /api/sync/outbox route) or a raw repo (as
-    # in the unit tests, which call sync.apply_outbox directly against a
-    # JsonRepo). Only the latter needs the proxy's ContextVar redirected —
-    # doing it unconditionally would point the proxy's ContextVar AT the
-    # proxy itself and recurse forever through `_RepoProxy.__getattr__`.
     is_proxy = repo is main.repo
-
-    original_append = repo.append_event
-
-    def _append_with_client_identity(event, _orig=original_append):
-        event["event_id"] = eid
-        event["seq"] = seq
-        # _write_events always sets occurred_at to None (it is unused on the
-        # online path); the offline client's real capture timestamp is what
-        # stock-take conflict resolution above compares on, so it must
-        # survive the pipeline the same way event_id and seq do.
-        if ev.get("occurred_at"):
-            event["occurred_at"] = ev["occurred_at"]
-        return _orig(event)
-
-    repo.append_event = _append_with_client_identity
     token = None if is_proxy else main._CURRENT.set(repo)
     try:
         item = dict(ev)
+        item["event_id"] = eid
+        item["seq"] = seq
         main._write_events(
             ev.get("type"), [item],
             ev.get("occurred_on"), ev.get("precision", "exact"),
@@ -180,7 +165,6 @@ def _write_through_pipeline(repo, ev: dict, eid: str, seq: int) -> None:
     finally:
         if token is not None:
             main._CURRENT.reset(token)
-        del repo.append_event
 
 
 def apply_outbox(repo, events: list) -> dict:

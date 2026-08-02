@@ -943,6 +943,18 @@ def _write_events(etype: str, items: list, occurred_on: str, precision: str,
             # These carry a party (who the note/return is against) even though
             # they aren't a "sale" — needed for the Tally export party ledger.
             ev["customer_id"] = it.get("customer_id")
+        # An offline outbox item (backend/sync.py) already carries its own
+        # client-generated ULID (and the wall-clock timestamp/seq that go
+        # with it) and must keep it end to end — resend idempotency depends
+        # on the stored event_id matching what the client dedupes against.
+        # Every online caller's items never set these, so behaviour there is
+        # unchanged.
+        if it.get("event_id"):
+            ev["event_id"] = it["event_id"]
+        if it.get("occurred_at"):
+            ev["occurred_at"] = it["occurred_at"]
+        if it.get("seq") is not None:
+            ev["seq"] = it["seq"]
         eid = repo.append_event(ev)
         amount = (L.line_amount(
             float(it["qty"]), it.get("unit", sku["default_unit"]),
