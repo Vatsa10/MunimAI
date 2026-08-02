@@ -29,6 +29,10 @@ from repo import JsonRepo
 SKU = {"sku_id": "s1", "canonical": "Cement", "family": "cement",
        "default_unit": "bag", "units": {"bag": 1}, "gst_rate": 18}
 
+PRICED_SKU = {"sku_id": "s1", "canonical": "Cement", "family": "cement",
+              "default_unit": "bag", "units": {"bag": 1}, "gst_rate": 18,
+              "opening_cost_per_kg": 300}
+
 
 def _repo(tmp_dir: str) -> JsonRepo:
     r = JsonRepo(Path(tmp_dir))
@@ -138,6 +142,129 @@ class OfflineRoundTripTests(unittest.TestCase):
                              ["duplicate"] * 3)
             self.assertEqual(len(repo.all_events()), events_after_first)
             self.assertEqual(L.stock_at(SKU, repo.all_events()), 90)
+
+
+class OfflineWritePipelineTests(unittest.TestCase):
+    """The offline outbox must go through main._write_events, not a raw
+    repo.append_event — otherwise offline sales skip rate-unit conversion,
+    confidence scoring and cost-based rate assumption (spec 5.3/5.4)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = JsonRepo(Path(self.tmp.name))
+        self.repo.upsert_sku(PRICED_SKU)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_offline_sale_with_no_rate_is_auto_priced_like_the_online_path(self):
+        # Establish a baseline so the sale isn't UNCOUNTED.
+        sync.apply_outbox(self.repo, [_ev("ulid_open", "opening_balance", 100)])
+
+        outbox_ev = _ev("ulid_sale", "sale", 5)
+        outbox_ev.pop("unit", None)
+        outbox_ev["unit"] = "bag"
+        # No rate/rate_unit supplied, as the offline client never asked one.
+        sync.apply_outbox(self.repo, [outbox_ev])
+
+        stored = next(e for e in self.repo.all_events()
+                     if e["event_id"] == "ulid_sale")
+
+        token = main._CURRENT.set(self.repo)
+        try:
+            online = main._write_events(
+                "sale", [{"sku_id": "s1", "qty": 5, "unit": "bag"}],
+                "2026-08-01", "exact", "voice_live")
+        finally:
+            main._CURRENT.reset(token)
+        expected_rate = online["committed"][0]["rate"]
+
+        self.assertIsNotNone(stored.get("quoted_rate"))
+        self.assertEqual(stored["quoted_rate"], expected_rate)
+        self.assertIsNotNone(stored.get("confidence"))
+
+    def test_resent_outbox_is_still_a_no_op_after_pipeline_change(self):
+        outbox = [_ev("ulid_open", "opening_balance", 100),
+                  _ev("ulid_sale", "sale", 5)]
+        sync.apply_outbox(self.repo, outbox)
+        before = list(self.repo.all_events())
+
+        again = sync.apply_outbox(self.repo, outbox)
+
+        self.assertEqual([r["status"] for r in again["results"]],
+                         ["duplicate", "duplicate"])
+        self.assertEqual(self.repo.all_events(), before)
+        # The client's ULID must survive the pipeline, or dedupe breaks.
+        ids = {e["event_id"] for e in self.repo.all_events()}
+        self.assertEqual(ids, {"ulid_open", "ulid_sale"})
+
+    def test_offline_sale_still_moves_stock(self):
+        sync.apply_outbox(self.repo, [_ev("ulid_open", "opening_balance", 100),
+                                      _ev("ulid_sale", "sale", 5)])
+        self.assertEqual(L.stock_at(PRICED_SKU, self.repo.all_events()), 95)
+
+
+class ConflictResolutionTests(unittest.TestCase):
+    """Spec 5.5: stock takes resolve by timestamp; product edits are last
+    write wins with an audit row."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = _repo(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_stock_take_conflict_resolves_by_timestamp(self):
+        older = _ev("ulid_older", "stock_take", 50)
+        older["occurred_at"] = "2026-08-01T09:00:00"
+        newer = _ev("ulid_newer", "stock_take", 80)
+        newer["occurred_at"] = "2026-08-01T18:00:00"
+
+        # The newer count syncs first (its device reconnected sooner)...
+        sync.apply_outbox(self.repo, [newer])
+        # ...then the older, delayed count arrives afterwards.
+        out = sync.apply_outbox(self.repo, [older])
+
+        self.assertEqual(out["results"][0]["status"], "conflict_superseded")
+        self.assertEqual(L.stock_at(SKU, self.repo.all_events()), 80)
+
+    def test_stock_take_conflict_lets_the_later_timestamp_win_regardless_of_order(self):
+        older = _ev("ulid_older", "stock_take", 50)
+        older["occurred_at"] = "2026-08-01T09:00:00"
+        newer = _ev("ulid_newer", "stock_take", 80)
+        newer["occurred_at"] = "2026-08-01T18:00:00"
+
+        # This time the older one happens to sync first.
+        sync.apply_outbox(self.repo, [older])
+        out = sync.apply_outbox(self.repo, [newer])
+
+        self.assertEqual(out["results"][0]["status"], "accepted")
+        self.assertEqual(L.stock_at(SKU, self.repo.all_events()), 80)
+
+    def test_product_edit_writes_an_audit_row(self):
+        edit = {"event_id": "ulid_edit", "type": "product_edit", "sku_id": "s1",
+                "patch": {"canonical": "Cement (Super Fine)"},
+                "occurred_at": "2026-08-01T10:00:00"}
+
+        sync.apply_outbox(self.repo, [edit])
+
+        self.assertEqual(self.repo.sku("s1")["canonical"], "Cement (Super Fine)")
+        rows = self.repo._store.read("product_edit_audit.json", [])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["sku_id"], "s1")
+        self.assertEqual(rows[0]["old_value"]["canonical"], "Cement")
+        self.assertEqual(rows[0]["new_value"]["canonical"], "Cement (Super Fine)")
+
+    def test_product_edit_resend_is_a_no_op(self):
+        edit = {"event_id": "ulid_edit", "type": "product_edit", "sku_id": "s1",
+                "patch": {"canonical": "Cement (Super Fine)"},
+                "occurred_at": "2026-08-01T10:00:00"}
+        sync.apply_outbox(self.repo, [edit])
+        out = sync.apply_outbox(self.repo, [edit])
+        self.assertEqual(out["results"][0]["status"], "duplicate")
+        rows = self.repo._store.read("product_edit_audit.json", [])
+        self.assertEqual(len(rows), 1)
 
 
 USER = {"user_id": "u_offline", "phone": "+919999999998", "name": "Owner",

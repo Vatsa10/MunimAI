@@ -236,6 +236,22 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_user_id TEXT
 -- B3: multi-rate price lists. A customer's default tier; per-SKU tier rates
 -- live in skus.attributes (already JSONB) as attributes.price_tiers.
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS price_tier TEXT;
+
+-- Offline sync conflict resolution (spec 5.5): product edits are last write
+-- wins, but the row overwritten by `skus` UPSERT is preserved here so an
+-- owner can see what a conflicting offline edit clobbered.
+CREATE TABLE IF NOT EXISTS product_edit_audit (
+    user_id    TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    audit_id   TEXT NOT NULL,
+    sku_id     TEXT NOT NULL,
+    event_id   TEXT NOT NULL,
+    edited_at  TEXT,
+    old_value  JSONB NOT NULL DEFAULT '{}'::jsonb,
+    new_value  JSONB NOT NULL DEFAULT '{}'::jsonb,
+    PRIMARY KEY (user_id, audit_id)
+);
+CREATE INDEX IF NOT EXISTS product_edit_audit_user_sku
+    ON product_edit_audit(user_id, sku_id);
 """
 
 
