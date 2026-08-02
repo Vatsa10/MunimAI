@@ -1563,6 +1563,41 @@ def bill(payload: dict = Body(...)):
 
 
 # ---------------------------------------------------------------------------
+# B3 — bulk catalogue import (dry-run preview -> commit) and price-list tiers.
+# ---------------------------------------------------------------------------
+@app.post("/api/catalogue/import/preview")
+async def catalogue_import_preview(file: UploadFile = File(...)):
+    """Parses the upload and reports created-vs-updated. Never writes —
+    the owner must call /commit separately after reviewing this."""
+    import catalogue_import as CI
+    content = await file.read()
+    rows = CI.parse_rows(content, file.filename or "")
+    return CI.preview_rows(rows, repo.load_catalogue())
+
+
+@app.post("/api/catalogue/import/commit")
+async def catalogue_import_commit(file: UploadFile = File(...)):
+    import catalogue_import as CI
+    content = await file.read()
+    rows = CI.parse_rows(content, file.filename or "")
+    return CI.commit_rows(rows, repo.load_catalogue(), repo)
+
+
+@app.post("/api/customers/{customer_id}/price-tier")
+def set_customer_price_tier(customer_id: str, payload: dict = Body(...)):
+    tier = payload.get("tier")
+    if tier not in ("retail", "contractor", "dealer"):
+        return Response(status_code=400,
+                        content='{"error":"tier must be retail, contractor or dealer"}',
+                        media_type="application/json")
+    if not hasattr(repo, "set_customer_price_tier"):
+        return Response(status_code=501,
+                        content='{"error":"price tiers are not available on this backend"}',
+                        media_type="application/json")
+    return repo.set_customer_price_tier(customer_id, tier)
+
+
+# ---------------------------------------------------------------------------
 # B2 — sales returns, credit/debit notes, and the Tally/Busy XML export.
 #
 # All three event types are created through the same _write_events path as a

@@ -9,3 +9,4 @@ python-dateutil==2.9.0.post0
 sarvamai==0.1.28
 sarvam-conv-ai-sdk==1.0.21
 psycopg[binary]==3.2.13
+openpyxl==3.1.5
