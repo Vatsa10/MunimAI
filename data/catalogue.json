@@ -109,7 +109,7 @@
       "tonne": 20,
       "kg": 0.02
     },
-    "gst_rate": 28,
+    "gst_rate": 18,
     "opening_cost_per_kg": 421.98,
     "aliases": [
       "cement",
@@ -137,7 +137,7 @@
       "tonne": 20,
       "kg": 0.02
     },
-    "gst_rate": 28,
+    "gst_rate": 18,
     "opening_cost_per_kg": 396.56,
     "aliases": [
       "cement",
@@ -164,7 +164,7 @@
       "box": 1,
       "piece": 0.1
     },
-    "gst_rate": 28,
+    "gst_rate": 18,
     "opening_cost_per_kg": 711.78,
     "aliases": [
       "tile",
@@ -193,7 +193,7 @@
       "box": 1,
       "piece": 0.1
     },
-    "gst_rate": 28,
+    "gst_rate": 18,
     "opening_cost_per_kg": 42.0,
     "aliases": [
       "tile",

@@ -1,6 +1,26 @@
+import json
 import unittest
+from pathlib import Path
 
 import verticals
+
+
+# GST 2.0 (56th Council, effective 22 September 2025) collapsed the old
+# 5/12/18/28 structure to 5/18/40. A catalogue still carrying 28 quietly
+# overcharges every bill it touches, because agent.py computes invoice GST
+# straight from this field.
+GST_2_0_SLABS = {0, 5, 18, 40}
+
+
+class SeedCatalogueGstTests(unittest.TestCase):
+    def test_no_seed_sku_carries_a_pre_reform_gst_rate(self):
+        path = Path(__file__).resolve().parent.parent / "data" / "catalogue.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        items = data if isinstance(data, list) else data.get("catalogue", data)
+        offenders = [(s.get("sku_id"), s.get("gst_rate")) for s in items
+                     if s.get("gst_rate") is not None
+                     and s["gst_rate"] not in GST_2_0_SLABS]
+        self.assertEqual(offenders, [])
 
 
 class TenantVerticalTests(unittest.TestCase):
