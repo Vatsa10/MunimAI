@@ -112,7 +112,11 @@ class SqlRepo:
                 values.append(v)
             conn.execute(
                 f"INSERT INTO events (user_id, {', '.join(cols)}) VALUES ("
-                + ", ".join(["%s"] * (len(cols) + 1)) + ")",
+                + ", ".join(["%s"] * (len(cols) + 1)) + ")"
+                # An offline outbox resends whatever it could not confirm. The
+                # unique constraint turns that into a no-op instead of an error
+                # the client would have to distinguish from a real failure.
+                + " ON CONFLICT (user_id, event_id) DO NOTHING",
                 [self.user_id] + values)
         self._invalidate("events")
         return event["event_id"]

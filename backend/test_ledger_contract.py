@@ -52,5 +52,62 @@ class StockEffectTests(unittest.TestCase):
                          ledger.stock_at(SKU, base))
 
 
+class IdempotentInsertTests(unittest.TestCase):
+    """An offline outbox resends whatever it could not confirm.
+
+    Without conflict handling the second delivery raises a unique violation and
+    the client cannot tell 'already recorded' from 'failed', so it either drops
+    a sale or double-posts one.
+    """
+
+    def test_insert_statement_ignores_duplicate_event_ids(self):
+        import inspect
+
+        import sqlrepo
+
+        source = inspect.getsource(sqlrepo)
+        self.assertIn("ON CONFLICT (user_id, event_id) DO NOTHING", source)
+
+
+class SchemaAppendTests(unittest.TestCase):
+    """Three agents append schema concurrently; all of it must be idempotent."""
+
+    def _ddl(self):
+        import db
+
+        return db.SCHEMA
+
+    def test_events_has_a_sync_sequence_column(self):
+        self.assertIn("ALTER TABLE events ADD COLUMN IF NOT EXISTS seq BIGINT",
+                      self._ddl())
+
+    def test_vertical_priors_table_exists(self):
+        self.assertIn("CREATE TABLE IF NOT EXISTS vertical_priors", self._ddl())
+
+    def test_every_create_table_is_guarded(self):
+        ddl = self._ddl()
+        self.assertEqual(ddl.count("CREATE TABLE "),
+                         ddl.count("CREATE TABLE IF NOT EXISTS "))
+
+
+class FrontendSectionMarkerTests(unittest.TestCase):
+    """B and C both edit one 4,600-line file. Markers keep them out of each
+    other's regions so merges stay textual rather than semantic."""
+
+    SECTIONS = ("onboarding", "documents", "accounting", "offline")
+
+    def _html(self):
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent
+        return (root / "frontend" / "index.html").read_text(encoding="utf-8")
+
+    def test_every_owned_section_is_fenced(self):
+        html = self._html()
+        for name in self.SECTIONS:
+            self.assertIn(f"<!-- @section:{name} -->", html, name)
+            self.assertIn(f"<!-- @endsection:{name} -->", html, name)
+
+
 if __name__ == "__main__":
     unittest.main()

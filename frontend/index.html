@@ -2408,6 +2408,7 @@
             </div>
           </div>
 
+          <!-- @section:onboarding -->
           <div id="authStepOnboard" class="hidden">
             <h2 class="auth-title">Name your operation.</h2>
             <p class="auth-sub">Ye details bills aur reports par dikhengi.</p>
@@ -2421,6 +2422,7 @@
                       placeholder="Shop address for bills"></textarea>
             <button class="auth-primary" onclick="submitOnboarding()" id="obBtn">Start operating →</button>
           </div>
+          <!-- @endsection:onboarding -->
 
           <div id="authError" class="auth-error hidden"></div>
           <div class="auth-security-note">
@@ -4841,5 +4843,22 @@ async function start(){
 start();
 
 </script>
+
+<!-- Regions owned exclusively by one parallel sub-project. Insert only between
+     a marker and its @endsection counterpart; backend/test_ledger_contract.py
+     asserts these fences exist. -->
+
+<!-- @section:documents -->
+<!-- Sub-project B: challan, quotation, proforma, purchase order. -->
+<!-- @endsection:documents -->
+
+<!-- @section:accounting -->
+<!-- Sub-project B: credit notes, debit notes, returns, price lists, roles. -->
+<!-- @endsection:accounting -->
+
+<!-- @section:offline -->
+<!-- Sub-project C: service worker, IndexedDB outbox, offline state. -->
+<!-- @endsection:offline -->
+
 </body>
 </html>

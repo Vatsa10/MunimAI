@@ -208,6 +208,22 @@ CREATE INDEX IF NOT EXISTS voice_presentations_user_created
     ON voice_presentations(user_id, created_at);
 CREATE INDEX IF NOT EXISTS voice_presentations_expiry
     ON voice_presentations(expires_at);
+
+-- Offline sync ordering. The client generates event_id as a ULID and the
+-- server stamps an authoritative per-tenant sequence on receipt.
+ALTER TABLE events ADD COLUMN IF NOT EXISTS seq BIGINT;
+
+-- Vertical packs ship spoken-form priors. Global and versioned, never written
+-- by a tenant: a shop's own corrections go to `learning`, which outranks this
+-- during resolution.
+CREATE TABLE IF NOT EXISTS vertical_priors (
+    vertical_id  TEXT NOT NULL,
+    pack_version TEXT NOT NULL,
+    phrase       TEXT NOT NULL,
+    sku_ref      TEXT NOT NULL,
+    attributes   JSONB NOT NULL DEFAULT '{}'::jsonb,
+    PRIMARY KEY (vertical_id, pack_version, phrase)
+);
 """
 
 
