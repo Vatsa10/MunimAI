@@ -12,6 +12,8 @@
 
 - Run everything with the repo venv: `./venv/Scripts/python.exe`. A bare interpreter fails at import (`rapidfuzz`, `reportlab`, `psycopg`, `sarvamai`).
 - All new DDL is appended to `init_schema()` and must be idempotent (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`). Never reorder or edit existing statements.
+- **Run the suite with `DATABASE_URL` unset:** `DATABASE_URL= python -m unittest discover -s . -p 'test_*.py'`. With `.env` loaded the suite talks to live Neon, and `test_auth` followed by `test_knowledge_graph` then stalls indefinitely. This predates this work and is not caused by any change here. Unset, the full suite is 222 tests in ~6s.
+- On Windows, prefix `PYTHONIOENCODING=utf-8`. Without it `agent.py` raises `UnicodeEncodeError` printing Devanagari to a cp1252 console — an environment artifact, not a test failure.
 - No test may require a live `DATABASE_URL`. The suite is self-contained and must stay that way.
 - Money-only event types must remain stock-neutral by construction — do not add `else` branches to the replay loop.
 - Commit messages carry no Claude attribution.
