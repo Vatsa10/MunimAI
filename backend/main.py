@@ -76,9 +76,29 @@ def current_user() -> dict:
 
 
 def bind_user(user: dict):
-    """Attach a user (and their ledger) to this request."""
+    """Attach a user (and their ledger) to this request.
+
+    A staff account's `ledger_user_id` points at the shop owner's tenant, so
+    a cashier's sale lands in the owner's books, not a tenant of their own.
+    """
     _CURRENT_USER.set(user)
-    _CURRENT.set(sqlrepo.SqlRepo(user["user_id"]))
+    _CURRENT.set(sqlrepo.SqlRepo(user.get("ledger_user_id") or user["user_id"]))
+
+
+def _require_role(action: str) -> None:
+    """B4 — server-side role enforcement, checked in the handler itself so a
+    replayed request (not just a hidden UI button) is actually refused.
+    Staff accounts carry a `role`; an account with none is the original owner
+    flow and defaults to full access, so existing single-user shops are
+    unaffected."""
+    import permissions
+    user = current_user()
+    role = user.get("role") or permissions.DEFAULT_ROLE
+    try:
+        permissions.require(role, action)
+    except permissions.PermissionDenied:
+        raise HTTPException(
+            403, f"Your role ({role}) does not have permission to do this.")
 
 # uvicorn loads this file as the package module "backend.main", but it also
 # inserts backend/ onto sys.path (above) so that bare imports like
@@ -279,6 +299,10 @@ def onboarding(payload: dict = Body(...)):
 # ---------------------------------------------------------------------------
 @app.post("/api/send/bill")
 def send_bill(payload: dict = Body(...)):
+    # Deliberately left open to staff ("sale"): sending the bill for the sale
+    # just made is part of completing that sale, not a separate privileged
+    # action — see the commit message. Bulk/aggregate sends below require
+    # "write".
     import notify
     customer = payload.get("customer") or {}
     if customer.get("customer_id") and not customer.get("phone"):
@@ -296,6 +320,11 @@ def send_bill(payload: dict = Body(...)):
 
 @app.post("/api/send/summary")
 def send_summary(payload: dict = Body(...)):
+    # Business-summary and dunning sends are an owner/manager judgment call,
+    # not routine sale completion — see the commit message for the reasoning
+    # (sending the bill for the sale just made stays open to staff; sending
+    # the shop's aggregate figures or chasing outstanding credit does not).
+    _require_role("write")
     import notify
     period = "week" if payload.get("period") == "week" else "day"
     try:
@@ -322,6 +351,10 @@ def send_reminders(payload: dict = Body(default={}),
             out.append({"user": u["phone"],
                         **notify.send_due_reminders(repo, u, days_before=days)})
         return {"runs": out}
+    # Bulk dunning is a manager/owner call, not a staff one — same reasoning
+    # as /api/send/summary. The cron branch above is unaffected: it has no
+    # logged-in user/role at all, only the scheduler's own secret.
+    _require_role("write")
     return notify.send_due_reminders(repo, current_user(), days_before=days)
 
 
@@ -656,6 +689,7 @@ def get_config():
 
 @app.post("/api/config")
 def set_config(payload: dict = Body(...)):
+    _require_role("settings")
     repo.save_config(payload)
     return repo.load_config()
 
@@ -885,6 +919,10 @@ def _write_events(etype: str, items: list, occurred_on: str, precision: str,
             "evidence": {"transcript": it.get("spoken", ""),
                          **({"request_id": request_id} if request_id else {})},
         }
+        if etype in ("sales_return", "credit_note", "debit_note"):
+            # These carry a party (who the note/return is against) even though
+            # they aren't a "sale" — needed for the Tally export party ledger.
+            ev["customer_id"] = it.get("customer_id")
         eid = repo.append_event(ev)
         amount = (L.line_amount(
             float(it["qty"]), it.get("unit", sku["default_unit"]),
@@ -917,6 +955,7 @@ def customers():
 
 @app.post("/api/customers")
 def save_customer(payload: dict = Body(...)):
+    _require_role("write")
     try:
         return repo.upsert_customer(payload.get("phone", ""), payload.get("name", ""))
     except ValueError as e:
@@ -925,6 +964,7 @@ def save_customer(payload: dict = Body(...)):
 
 @app.patch("/api/customers/{customer_id}")
 def update_customer(customer_id: str, payload: dict = Body(...)):
+    _require_role("write")
     if not repo.customer(customer_id):
         raise HTTPException(404, "Customer not found.")
     try:
@@ -936,6 +976,7 @@ def update_customer(customer_id: str, payload: dict = Body(...)):
 
 @app.delete("/api/customers/{customer_id}")
 def delete_customer(customer_id: str):
+    _require_role("delete")
     if not repo.customer(customer_id):
         raise HTTPException(404, "Customer not found.")
     if not repo.delete_customer(customer_id):
@@ -970,6 +1011,8 @@ def record_payment(customer_id: str, payload: dict = Body(...)):
 
 @app.post("/api/customers/{customer_id}/reminder")
 def send_customer_reminder(customer_id: str):
+    # Dunning, same reasoning as bulk reminders/summary above.
+    _require_role("write")
     import notify
     if not repo.customer(customer_id):
         raise HTTPException(404, "Customer not found.")
@@ -1080,6 +1123,7 @@ def stock(as_of: str = None):
 
 @app.post("/api/stock")
 def add_stock_item(payload: dict = Body(...)):
+    _require_role("write")
     import agent as AGENT
     attributes = dict(payload.get("attributes") or {})
     if payload.get("type"):
@@ -1093,6 +1137,7 @@ def add_stock_item(payload: dict = Body(...)):
 
 @app.patch("/api/stock/{sku_id}")
 def update_stock_item(sku_id: str, payload: dict = Body(...)):
+    _require_role("write")
     import agent as AGENT
     if not repo.sku(sku_id):
         raise HTTPException(404, "Product inventory mein nahi mila.")
@@ -1105,6 +1150,7 @@ def update_stock_item(sku_id: str, payload: dict = Body(...)):
 
 @app.delete("/api/stock/{sku_id}")
 def delete_stock_item(sku_id: str):
+    _require_role("delete")
     sku = repo.sku(sku_id)
     if not sku:
         raise HTTPException(404, "Product inventory mein nahi mila.")
@@ -1535,12 +1581,19 @@ def bill(payload: dict = Body(...)):
     """
     import notify
     import pdfs
+    import hsn as HSN
+    import verticals
     user = current_user()
     customer = payload.get("customer") or {}
     if customer.get("customer_id") and not customer.get("name"):
         customer = repo.customer(customer["customer_id"]) or customer
     who = notify._identity(repo, user)
     on = clock.today()
+
+    # B5: HSN per line, from the SKU's own attributes or the loaded vertical
+    # pack's category default — blank if neither is present.
+    vertical_id, _ver = verticals.tenant_vertical(repo.load_config())
+    gst_map = HSN.load_gst_map(vertical_id)
 
     rows, subtotal, gst_total = [], 0.0, 0.0
     for it in payload.get("items", []):
@@ -1552,7 +1605,8 @@ def bill(payload: dict = Body(...)):
         gst_total += amount * float(repo.gst_rate_for(sku)) / 100.0
         subtotal += amount
         rows.append({"name": sku.get("canonical", it["sku_id"]), "qty": qty,
-                     "unit": unit, "rate": rate, "amount": amount})
+                     "unit": unit, "rate": rate, "amount": amount,
+                     "hsn": HSN.hsn_for_sku(sku, gst_map)})
     total = subtotal + gst_total
     bill_no = payload.get("bill_no") or f"{on:%Y%m%d}-{int(total) % 10000:04d}"
     payment = payload.get("payment") or (payload.get("items") or [{}])[0].get("payment") or "cash"
@@ -1561,10 +1615,264 @@ def bill(payload: dict = Body(...)):
         shop=who["shop"], owner=who["owner"], customer=customer, lines=rows,
         subtotal=subtotal, gst=gst_total, total=total, bill_no=bill_no, on=on,
         payment=payment, due_on=payload.get("payment_deadline"),
-        gstin=who["gstin"], phone=who["phone"], address=who["address"])
+        gstin=who["gstin"], phone=who["phone"], address=who["address"],
+        eway_bill_no=payload.get("eway_bill_no"))
     return Response(
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="bill-{bill_no}.pdf"'})
+
+
+# ---------------------------------------------------------------------------
+# B4 — staff accounts (roles) and thermal print layouts.
+# ---------------------------------------------------------------------------
+@app.post("/api/staff")
+def create_staff(payload: dict = Body(...)):
+    _require_role("manage_staff")
+    user = current_user()
+    try:
+        return auth.create_staff(
+            user.get("ledger_user_id") or user["user_id"], payload.get("phone"),
+            payload.get("name"), payload.get("password"), payload.get("role"))
+    except (ValueError, auth.AccountExists) as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/staff")
+def list_staff():
+    _require_role("manage_staff")
+    user = current_user()
+    return auth.staff_for_owner(user.get("ledger_user_id") or user["user_id"])
+
+
+@app.post("/api/bill/thermal")
+def bill_thermal(payload: dict = Body(...)):
+    """58mm/80mm thermal receipt — same line items as /api/bill, printer-width
+    layout instead of A4."""
+    import notify
+    import pdfs
+    user = current_user()
+    width = int(payload.get("width_mm") or 58)
+    customer = payload.get("customer") or {}
+    if customer.get("customer_id") and not customer.get("name"):
+        customer = repo.customer(customer["customer_id"]) or customer
+    who = notify._identity(repo, user)
+    on = clock.today()
+    rows, subtotal, gst_total = _priced_rows(payload.get("items", []))
+    total = subtotal + gst_total
+    bill_no = payload.get("bill_no") or f"{on:%Y%m%d}-{int(total) % 10000:04d}"
+    payment = payload.get("payment") or "cash"
+    pdf = pdfs.thermal_bill_pdf(
+        width_mm=width, shop=who["shop"], owner=who["owner"], customer=customer,
+        lines=rows, subtotal=subtotal, gst=gst_total, total=total,
+        bill_no=bill_no, on=on, payment=payment, gstin=who["gstin"],
+        phone=who["phone"])
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="bill-{bill_no}-{width}mm.pdf"'})
+
+
+# ---------------------------------------------------------------------------
+# B3 — bulk catalogue import (dry-run preview -> commit) and price-list tiers.
+# ---------------------------------------------------------------------------
+@app.post("/api/catalogue/import/preview")
+async def catalogue_import_preview(file: UploadFile = File(...)):
+    """Parses the upload and reports created-vs-updated. Never writes —
+    the owner must call /commit separately after reviewing this."""
+    import catalogue_import as CI
+    content = await file.read()
+    rows = CI.parse_rows(content, file.filename or "")
+    return CI.preview_rows(rows, repo.load_catalogue())
+
+
+@app.post("/api/catalogue/import/commit")
+async def catalogue_import_commit(file: UploadFile = File(...)):
+    _require_role("write")
+    import catalogue_import as CI
+    content = await file.read()
+    rows = CI.parse_rows(content, file.filename or "")
+    return CI.commit_rows(rows, repo.load_catalogue(), repo)
+
+
+@app.post("/api/customers/{customer_id}/price-tier")
+def set_customer_price_tier(customer_id: str, payload: dict = Body(...)):
+    _require_role("write")
+    tier = payload.get("tier")
+    if tier not in ("retail", "contractor", "dealer"):
+        return Response(status_code=400,
+                        content='{"error":"tier must be retail, contractor or dealer"}',
+                        media_type="application/json")
+    if not hasattr(repo, "set_customer_price_tier"):
+        return Response(status_code=501,
+                        content='{"error":"price tiers are not available on this backend"}',
+                        media_type="application/json")
+    return repo.set_customer_price_tier(customer_id, tier)
+
+
+# ---------------------------------------------------------------------------
+# B2 — sales returns, credit/debit notes, and the Tally/Busy XML export.
+#
+# All three event types are created through the same _write_events path as a
+# sale, so they get the same idempotent request_id handling and confidence
+# scoring. sales_return restores stock via the branch the foundation added to
+# _stock_detail; credit_note/debit_note stay stock-neutral by construction
+# because the replay loop has no branch for them.
+# ---------------------------------------------------------------------------
+@app.post("/api/accounting/sales-return")
+def accounting_sales_return(payload: dict = Body(...)):
+    _require_role("write")
+    return _write_events("sales_return", payload.get("items", []),
+                         payload.get("occurred_on") or clock.today().isoformat(),
+                         payload.get("precision", "exact"), "manual",
+                         payload.get("request_id", ""))
+
+
+@app.post("/api/accounting/credit-note")
+def accounting_credit_note(payload: dict = Body(...)):
+    _require_role("write")
+    return _write_events("credit_note", payload.get("items", []),
+                         payload.get("occurred_on") or clock.today().isoformat(),
+                         payload.get("precision", "exact"), "manual",
+                         payload.get("request_id", ""))
+
+
+@app.post("/api/accounting/debit-note")
+def accounting_debit_note(payload: dict = Body(...)):
+    _require_role("write")
+    return _write_events("debit_note", payload.get("items", []),
+                         payload.get("occurred_on") or clock.today().isoformat(),
+                         payload.get("precision", "exact"), "manual",
+                         payload.get("request_id", ""))
+
+
+@app.get("/api/accounting/tally-export")
+def accounting_tally_export(start: str, end: str):
+    import tally_export
+    events = repo.events_in_range(L._d(start), L._d(end))
+    payments = [p for p in repo.payments()
+               if p.get("paid_on") and start <= p["paid_on"] <= end]
+    catalogue_by_id = by_id()
+    customers_by_id = {c["customer_id"]: c for c in repo.customers()}
+    xml = tally_export.build_tally_xml(
+        events=events, payments=payments, catalogue_by_id=catalogue_by_id,
+        customers_by_id=customers_by_id)
+    return Response(
+        content=xml, media_type="application/xml",
+        headers={"Content-Disposition":
+                f'attachment; filename="tally-export-{start}-to-{end}.xml"'})
+
+
+# ---------------------------------------------------------------------------
+# B1 — delivery challan, quotation, proforma invoice, purchase order.
+#
+# Same reportlab pipeline as the tax invoice (pdfs.py), but each is stored
+# through documents.py rather than streamed inline: these are usually shared
+# with a customer or supplier over WhatsApp/link rather than downloaded on
+# the spot, and documents.py's token URL is what makes that link fetchable
+# without a login.
+# ---------------------------------------------------------------------------
+def _priced_rows(items: list) -> tuple:
+    rows, subtotal, gst_total = [], 0.0, 0.0
+    for it in items:
+        sku = repo.sku(it.get("sku_id")) or {}
+        qty = float(it["qty"])
+        unit = it.get("unit") or sku.get("default_unit")
+        rate = float(it.get("rate") or 0)
+        amount = L.line_amount(qty, unit, rate, it.get("rate_unit") or unit, sku) \
+            if sku else round(qty * rate, 2)
+        gst_total += amount * float(repo.gst_rate_for(sku)) / 100.0
+        subtotal += amount
+        rows.append({"name": sku.get("canonical", it.get("item") or it.get("sku_id")),
+                     "qty": qty, "unit": unit, "rate": rate, "amount": amount})
+    return rows, subtotal, gst_total
+
+
+@app.post("/api/documents/challan")
+def document_challan(payload: dict = Body(...)):
+    import documents
+    import notify
+    import pdfs
+    user = current_user()
+    customer = payload.get("customer") or {}
+    if customer.get("customer_id") and not customer.get("name"):
+        customer = repo.customer(customer["customer_id"]) or customer
+    who = notify._identity(repo, user)
+    on = clock.today()
+    rows = [{"name": (repo.sku(it.get("sku_id")) or {}).get("canonical")
+                    or it.get("item") or it.get("sku_id"),
+             "qty": it["qty"], "unit": it.get("unit")}
+            for it in payload.get("items", [])]
+    challan_no = payload.get("challan_no") or f"{on:%Y%m%d}-{secrets.randbelow(10000):04d}"
+    pdf = pdfs.challan_pdf(
+        shop=who["shop"], owner=who["owner"], customer=customer, lines=rows,
+        challan_no=challan_no, on=on, gstin=who["gstin"], phone=who["phone"],
+        address=who["address"], vehicle_no=payload.get("vehicle_no", ""))
+    doc = documents.store(user["user_id"], "challan", f"challan-{challan_no}.pdf", pdf)
+    return doc
+
+
+@app.post("/api/documents/quotation")
+def document_quotation(payload: dict = Body(...)):
+    import documents
+    import notify
+    import pdfs
+    user = current_user()
+    customer = payload.get("customer") or {}
+    if customer.get("customer_id") and not customer.get("name"):
+        customer = repo.customer(customer["customer_id"]) or customer
+    who = notify._identity(repo, user)
+    on = clock.today()
+    rows, subtotal, gst_total = _priced_rows(payload.get("items", []))
+    total = subtotal + gst_total
+    quote_no = payload.get("quote_no") or f"{on:%Y%m%d}-{secrets.randbelow(10000):04d}"
+    pdf = pdfs.quotation_pdf(
+        shop=who["shop"], owner=who["owner"], customer=customer, lines=rows,
+        subtotal=subtotal, gst=gst_total, total=total, quote_no=quote_no, on=on,
+        valid_until=payload.get("valid_until"), gstin=who["gstin"],
+        phone=who["phone"], address=who["address"])
+    doc = documents.store(user["user_id"], "quotation", f"quotation-{quote_no}.pdf", pdf)
+    return doc
+
+
+@app.post("/api/documents/proforma")
+def document_proforma(payload: dict = Body(...)):
+    import documents
+    import notify
+    import pdfs
+    user = current_user()
+    customer = payload.get("customer") or {}
+    if customer.get("customer_id") and not customer.get("name"):
+        customer = repo.customer(customer["customer_id"]) or customer
+    who = notify._identity(repo, user)
+    on = clock.today()
+    rows, subtotal, gst_total = _priced_rows(payload.get("items", []))
+    total = subtotal + gst_total
+    proforma_no = payload.get("proforma_no") or f"{on:%Y%m%d}-{secrets.randbelow(10000):04d}"
+    pdf = pdfs.proforma_pdf(
+        shop=who["shop"], owner=who["owner"], customer=customer, lines=rows,
+        subtotal=subtotal, gst=gst_total, total=total, proforma_no=proforma_no,
+        on=on, gstin=who["gstin"], phone=who["phone"], address=who["address"])
+    doc = documents.store(user["user_id"], "proforma", f"proforma-{proforma_no}.pdf", pdf)
+    return doc
+
+
+@app.post("/api/documents/purchase-order")
+def document_purchase_order(payload: dict = Body(...)):
+    import documents
+    import notify
+    import pdfs
+    user = current_user()
+    supplier = payload.get("supplier") or {}
+    who = notify._identity(repo, user)
+    on = clock.today()
+    rows, subtotal, gst_total = _priced_rows(payload.get("items", []))
+    total = subtotal + gst_total
+    po_no = payload.get("po_no") or f"{on:%Y%m%d}-{secrets.randbelow(10000):04d}"
+    pdf = pdfs.purchase_order_pdf(
+        shop=who["shop"], owner=who["owner"], supplier=supplier, lines=rows,
+        subtotal=subtotal, gst=gst_total, total=total, po_no=po_no, on=on,
+        gstin=who["gstin"], phone=who["phone"], address=who["address"])
+    doc = documents.store(user["user_id"], "purchase_order", f"po-{po_no}.pdf", pdf)
+    return doc
 
 
 # /api/reset was removed with the move to multi-tenancy. It called seed.main(),

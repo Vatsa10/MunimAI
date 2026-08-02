@@ -224,6 +224,18 @@ CREATE TABLE IF NOT EXISTS vertical_priors (
     attributes   JSONB NOT NULL DEFAULT '{}'::jsonb,
     PRIMARY KEY (vertical_id, pack_version, phrase)
 );
+
+-- B4: staff accounts under one shop. A staff/manager row is a normal `users`
+-- row with owner_user_id pointing at the shop owner's user_id; the owner's
+-- own row keeps owner_user_id NULL. role defaults to 'owner' so every
+-- pre-existing single-user account is unaffected.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'owner';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_user_id TEXT
+    REFERENCES users(user_id) ON DELETE CASCADE;
+
+-- B3: multi-rate price lists. A customer's default tier; per-SKU tier rates
+-- live in skus.attributes (already JSONB) as attributes.price_tiers.
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS price_tier TEXT;
 """
 
 

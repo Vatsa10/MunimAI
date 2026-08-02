@@ -404,6 +404,26 @@ class JsonRepo(Repo):
                 "customers.json", [], _update)
         return row
 
+    def set_customer_price_tier(self, customer_id: str, tier: str) -> dict:
+        """A customer's default price-list tier (retail/contractor/dealer).
+
+        Stored as a plain extra field on the customer row rather than a new
+        JSON file — one JSONB-shaped bag would be the Postgres equivalent,
+        but sqlrepo.py is frozen, so this stays a JsonRepo-only capability;
+        see B3 in the parity-pack plan for the tradeoff.
+        """
+        def _set(customers):
+            row = next((c for c in customers
+                       if c.get("customer_id") == customer_id), None)
+            if not row:
+                raise ValueError("customer not found")
+            row["price_tier"] = tier
+            return dict(row)
+
+        with self._lock:
+            self._customers, row = self._store.mutate("customers.json", [], _set)
+        return row
+
     def delete_customer(self, customer_id: str) -> bool:
         """Delete only a contact with no financial or sale history."""
         if any(e.get("customer_id") == customer_id for e in self._events):

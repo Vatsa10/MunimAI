@@ -131,16 +131,21 @@ def authenticate(phone: str, password: str) -> dict:
     _ensure_password_schema()
     with db.connect() as conn:
         row = conn.execute(
-            "SELECT user_id, phone, name, shop_name, onboarded_at, password_hash"
-            " FROM users WHERE phone = %s", (norm,)).fetchone()
+            "SELECT user_id, phone, name, shop_name, onboarded_at, password_hash,"
+            " role, owner_user_id FROM users WHERE phone = %s", (norm,)).fetchone()
     if not row:
         raise UserNotFound("No account exists for this number.")
     if not row[5]:
         raise PasswordSetupRequired("This existing account needs a password.")
     if not verify_password(password, row[5]):
         raise InvalidCredentials("Mobile number or password is incorrect.")
+    # A staff account operates on its owner's ledger, never its own — there is
+    # no separate tenant for a cashier. `user_id` stays the login identity
+    # (used for the session row); `ledger_user_id` is what main.bind_user
+    # scopes the repo to.
     return {"user_id": row[0], "phone": row[1], "name": row[2],
-            "shop_name": row[3], "onboarded": row[4] is not None}
+            "shop_name": row[3], "onboarded": row[4] is not None,
+            "role": row[6] or "owner", "ledger_user_id": row[7] or row[0]}
 
 
 def signup(phone: str, name: str, password: str) -> dict:
@@ -176,7 +181,8 @@ def signup(phone: str, name: str, password: str) -> dict:
                 (user_id, norm, encoded, name))
             shop_name, onboarded = "", None
     return {"user_id": user_id, "phone": norm, "name": name,
-            "shop_name": shop_name, "onboarded": onboarded is not None}
+            "shop_name": shop_name, "onboarded": onboarded is not None,
+            "role": "owner", "ledger_user_id": user_id}
 
 
 # ---------------------------------------------------------------------------
@@ -227,14 +233,55 @@ def user_for_token(token: str):
         return None
     with db.connect() as conn:
         row = conn.execute(
-            "SELECT u.user_id, u.phone, u.name, u.shop_name, u.onboarded_at"
+            "SELECT u.user_id, u.phone, u.name, u.shop_name, u.onboarded_at,"
+            " u.role, u.owner_user_id"
             " FROM sessions s JOIN users u ON u.user_id = s.user_id"
             " WHERE s.token_hash = %s AND s.expires_at > now()",
             (_hash(token),)).fetchone()
     if not row:
         return None
     return {"user_id": row[0], "phone": row[1], "name": row[2],
-            "shop_name": row[3], "onboarded": row[4] is not None}
+            "shop_name": row[3], "onboarded": row[4] is not None,
+            "role": row[5] or "owner", "ledger_user_id": row[6] or row[0]}
+
+
+# ---------------------------------------------------------------------------
+# B4 — staff accounts (roles: owner / manager / staff)
+# ---------------------------------------------------------------------------
+def create_staff(owner_user_id: str, phone: str, name: str, password: str,
+                 role: str) -> dict:
+    """Only an owner may call this (checked by the route, via
+    permissions.require) — a staff account never creates another one."""
+    if role not in ("manager", "staff"):
+        raise ValueError("role must be 'manager' or 'staff'")
+    norm = normalize_phone(phone)
+    name = (name or "").strip()
+    if not norm:
+        raise ValueError("Enter a valid 10-digit mobile number.")
+    if len(name) < 2:
+        raise ValueError("Enter the staff member's name.")
+    encoded = hash_password(password)
+    with db.connect() as conn:
+        existing = conn.execute(
+            "SELECT user_id FROM users WHERE phone = %s", (norm,)).fetchone()
+        if existing:
+            raise AccountExists("An account already exists for this number.")
+        user_id = "usr_" + secrets.token_hex(8)
+        conn.execute(
+            "INSERT INTO users (user_id, phone, password_hash, name, role,"
+            " owner_user_id, onboarded_at) VALUES (%s,%s,%s,%s,%s,%s, now())",
+            (user_id, norm, encoded, name, role, owner_user_id))
+    return {"user_id": user_id, "phone": norm, "name": name, "role": role,
+            "owner_user_id": owner_user_id}
+
+
+def staff_for_owner(owner_user_id: str) -> list:
+    with db.connect() as conn:
+        rows = conn.execute(
+            "SELECT user_id, phone, name, role FROM users"
+            " WHERE owner_user_id = %s", (owner_user_id,)).fetchall()
+    return [{"user_id": r[0], "phone": r[1], "name": r[2], "role": r[3]}
+            for r in rows]
 
 
 def revoke_session(token: str) -> None:
