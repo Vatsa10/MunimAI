@@ -876,6 +876,10 @@ def _write_events(etype: str, items: list, occurred_on: str, precision: str,
             "evidence": {"transcript": it.get("spoken", ""),
                          **({"request_id": request_id} if request_id else {})},
         }
+        if etype in ("sales_return", "credit_note", "debit_note"):
+            # These carry a party (who the note/return is against) even though
+            # they aren't a "sale" — needed for the Tally export party ledger.
+            ev["customer_id"] = it.get("customer_id")
         eid = repo.append_event(ev)
         amount = (L.line_amount(
             float(it["qty"]), it.get("unit", sku["default_unit"]),
@@ -1556,6 +1560,56 @@ def bill(payload: dict = Body(...)):
     return Response(
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="bill-{bill_no}.pdf"'})
+
+
+# ---------------------------------------------------------------------------
+# B2 — sales returns, credit/debit notes, and the Tally/Busy XML export.
+#
+# All three event types are created through the same _write_events path as a
+# sale, so they get the same idempotent request_id handling and confidence
+# scoring. sales_return restores stock via the branch the foundation added to
+# _stock_detail; credit_note/debit_note stay stock-neutral by construction
+# because the replay loop has no branch for them.
+# ---------------------------------------------------------------------------
+@app.post("/api/accounting/sales-return")
+def accounting_sales_return(payload: dict = Body(...)):
+    return _write_events("sales_return", payload.get("items", []),
+                         payload.get("occurred_on") or clock.today().isoformat(),
+                         payload.get("precision", "exact"), "manual",
+                         payload.get("request_id", ""))
+
+
+@app.post("/api/accounting/credit-note")
+def accounting_credit_note(payload: dict = Body(...)):
+    return _write_events("credit_note", payload.get("items", []),
+                         payload.get("occurred_on") or clock.today().isoformat(),
+                         payload.get("precision", "exact"), "manual",
+                         payload.get("request_id", ""))
+
+
+@app.post("/api/accounting/debit-note")
+def accounting_debit_note(payload: dict = Body(...)):
+    return _write_events("debit_note", payload.get("items", []),
+                         payload.get("occurred_on") or clock.today().isoformat(),
+                         payload.get("precision", "exact"), "manual",
+                         payload.get("request_id", ""))
+
+
+@app.get("/api/accounting/tally-export")
+def accounting_tally_export(start: str, end: str):
+    import tally_export
+    events = repo.events_in_range(L._d(start), L._d(end))
+    payments = [p for p in repo.payments()
+               if p.get("paid_on") and start <= p["paid_on"] <= end]
+    catalogue_by_id = by_id()
+    customers_by_id = {c["customer_id"]: c for c in repo.customers()}
+    xml = tally_export.build_tally_xml(
+        events=events, payments=payments, catalogue_by_id=catalogue_by_id,
+        customers_by_id=customers_by_id)
+    return Response(
+        content=xml, media_type="application/xml",
+        headers={"Content-Disposition":
+                f'attachment; filename="tally-export-{start}-to-{end}.xml"'})
 
 
 # ---------------------------------------------------------------------------
