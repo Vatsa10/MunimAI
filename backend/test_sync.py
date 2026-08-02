@@ -12,11 +12,16 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from fastapi.testclient import TestClient
+
 import ledger as L
+import main
 import sync
 from repo import JsonRepo
 
@@ -133,6 +138,66 @@ class OfflineRoundTripTests(unittest.TestCase):
                              ["duplicate"] * 3)
             self.assertEqual(len(repo.all_events()), events_after_first)
             self.assertEqual(L.stock_at(SKU, repo.all_events()), 90)
+
+
+USER = {"user_id": "u_offline", "phone": "+919999999998", "name": "Owner",
+        "shop_name": "Offline Traders"}
+
+
+@contextmanager
+def _signed_in(repo):
+    """Route the session middleware to a temp-dir JsonRepo, no live DB."""
+    def _bind(user):
+        main._CURRENT_USER.set(user)
+        main._CURRENT.set(repo)
+
+    with patch.object(main.auth, "user_for_token", return_value=USER), \
+            patch.object(main, "bind_user", side_effect=_bind):
+        yield TestClient(main.app)
+
+
+class SyncRoutesTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = _repo(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_outbox_route_applies_and_reports_per_event_status(self):
+        with _signed_in(self.repo) as client:
+            resp = client.post(
+                "/api/sync/outbox",
+                headers={"Authorization": "Bearer x"},
+                json={"events": [_ev("ulid_1", "opening_balance", 50)]})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["results"][0]["status"], "accepted")
+
+    def test_outbox_route_is_a_no_op_on_resend(self):
+        outbox = {"events": [_ev("ulid_1", "opening_balance", 50)]}
+        with _signed_in(self.repo) as client:
+            client.post("/api/sync/outbox", headers={"Authorization": "Bearer x"},
+                       json=outbox)
+            resp = client.post("/api/sync/outbox",
+                               headers={"Authorization": "Bearer x"}, json=outbox)
+        self.assertEqual(resp.json()["results"][0]["status"], "duplicate")
+
+    def test_snapshot_route_requires_a_session(self):
+        with _signed_in(self.repo) as client:
+            pass  # exits the patch context before the unauthenticated call
+        resp = client.get("/api/sync/snapshot")
+        self.assertEqual(resp.status_code, 401)
+
+    def test_snapshot_route_returns_stock_and_dues(self):
+        with _signed_in(self.repo) as client:
+            client.post("/api/sync/outbox", headers={"Authorization": "Bearer x"},
+                       json={"events": [_ev("ulid_1", "opening_balance", 50)]})
+            resp = client.get("/api/sync/snapshot",
+                              headers={"Authorization": "Bearer x"})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["stock"]["s1"]["qty"], 50)
+        self.assertIn("dues", body)
 
 
 if __name__ == "__main__":

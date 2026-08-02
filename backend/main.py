@@ -1046,6 +1046,27 @@ def _low_stock_items(target_repo=None, *, lookback_days: int = 30,
 
 
 # ---------------------------------------------------------------------------
+# Offline sync — outbox apply + compact snapshot (spec section 5, sub-project C)
+# ---------------------------------------------------------------------------
+@app.post("/api/sync/outbox")
+def sync_outbox(payload: dict = Body(...)):
+    """An offline client's queued events, posted wholesale on reconnect.
+
+    Idempotent: resending an outbox the server has already seen some or all
+    of is always safe (backend/sync.py dedupes on event_id).
+    """
+    import sync
+    return sync.apply_outbox(repo, payload.get("events") or [])
+
+
+@app.get("/api/sync/snapshot")
+def sync_snapshot():
+    """Compact stock/dues state for the client to replay local events onto."""
+    import sync
+    return sync.snapshot(repo)
+
+
+# ---------------------------------------------------------------------------
 # Stock listing + reconciliation
 # ---------------------------------------------------------------------------
 @app.get("/api/stock")
