@@ -1558,6 +1558,120 @@ def bill(payload: dict = Body(...)):
         headers={"Content-Disposition": f'inline; filename="bill-{bill_no}.pdf"'})
 
 
+# ---------------------------------------------------------------------------
+# B1 — delivery challan, quotation, proforma invoice, purchase order.
+#
+# Same reportlab pipeline as the tax invoice (pdfs.py), but each is stored
+# through documents.py rather than streamed inline: these are usually shared
+# with a customer or supplier over WhatsApp/link rather than downloaded on
+# the spot, and documents.py's token URL is what makes that link fetchable
+# without a login.
+# ---------------------------------------------------------------------------
+def _priced_rows(items: list) -> tuple:
+    rows, subtotal, gst_total = [], 0.0, 0.0
+    for it in items:
+        sku = repo.sku(it.get("sku_id")) or {}
+        qty = float(it["qty"])
+        unit = it.get("unit") or sku.get("default_unit")
+        rate = float(it.get("rate") or 0)
+        amount = L.line_amount(qty, unit, rate, it.get("rate_unit") or unit, sku) \
+            if sku else round(qty * rate, 2)
+        gst_total += amount * float(repo.gst_rate_for(sku)) / 100.0
+        subtotal += amount
+        rows.append({"name": sku.get("canonical", it.get("item") or it.get("sku_id")),
+                     "qty": qty, "unit": unit, "rate": rate, "amount": amount})
+    return rows, subtotal, gst_total
+
+
+@app.post("/api/documents/challan")
+def document_challan(payload: dict = Body(...)):
+    import documents
+    import notify
+    import pdfs
+    user = current_user()
+    customer = payload.get("customer") or {}
+    if customer.get("customer_id") and not customer.get("name"):
+        customer = repo.customer(customer["customer_id"]) or customer
+    who = notify._identity(repo, user)
+    on = clock.today()
+    rows = [{"name": (repo.sku(it.get("sku_id")) or {}).get("canonical")
+                    or it.get("item") or it.get("sku_id"),
+             "qty": it["qty"], "unit": it.get("unit")}
+            for it in payload.get("items", [])]
+    challan_no = payload.get("challan_no") or f"{on:%Y%m%d}-{secrets.randbelow(10000):04d}"
+    pdf = pdfs.challan_pdf(
+        shop=who["shop"], owner=who["owner"], customer=customer, lines=rows,
+        challan_no=challan_no, on=on, gstin=who["gstin"], phone=who["phone"],
+        address=who["address"], vehicle_no=payload.get("vehicle_no", ""))
+    doc = documents.store(user["user_id"], "challan", f"challan-{challan_no}.pdf", pdf)
+    return doc
+
+
+@app.post("/api/documents/quotation")
+def document_quotation(payload: dict = Body(...)):
+    import documents
+    import notify
+    import pdfs
+    user = current_user()
+    customer = payload.get("customer") or {}
+    if customer.get("customer_id") and not customer.get("name"):
+        customer = repo.customer(customer["customer_id"]) or customer
+    who = notify._identity(repo, user)
+    on = clock.today()
+    rows, subtotal, gst_total = _priced_rows(payload.get("items", []))
+    total = subtotal + gst_total
+    quote_no = payload.get("quote_no") or f"{on:%Y%m%d}-{secrets.randbelow(10000):04d}"
+    pdf = pdfs.quotation_pdf(
+        shop=who["shop"], owner=who["owner"], customer=customer, lines=rows,
+        subtotal=subtotal, gst=gst_total, total=total, quote_no=quote_no, on=on,
+        valid_until=payload.get("valid_until"), gstin=who["gstin"],
+        phone=who["phone"], address=who["address"])
+    doc = documents.store(user["user_id"], "quotation", f"quotation-{quote_no}.pdf", pdf)
+    return doc
+
+
+@app.post("/api/documents/proforma")
+def document_proforma(payload: dict = Body(...)):
+    import documents
+    import notify
+    import pdfs
+    user = current_user()
+    customer = payload.get("customer") or {}
+    if customer.get("customer_id") and not customer.get("name"):
+        customer = repo.customer(customer["customer_id"]) or customer
+    who = notify._identity(repo, user)
+    on = clock.today()
+    rows, subtotal, gst_total = _priced_rows(payload.get("items", []))
+    total = subtotal + gst_total
+    proforma_no = payload.get("proforma_no") or f"{on:%Y%m%d}-{secrets.randbelow(10000):04d}"
+    pdf = pdfs.proforma_pdf(
+        shop=who["shop"], owner=who["owner"], customer=customer, lines=rows,
+        subtotal=subtotal, gst=gst_total, total=total, proforma_no=proforma_no,
+        on=on, gstin=who["gstin"], phone=who["phone"], address=who["address"])
+    doc = documents.store(user["user_id"], "proforma", f"proforma-{proforma_no}.pdf", pdf)
+    return doc
+
+
+@app.post("/api/documents/purchase-order")
+def document_purchase_order(payload: dict = Body(...)):
+    import documents
+    import notify
+    import pdfs
+    user = current_user()
+    supplier = payload.get("supplier") or {}
+    who = notify._identity(repo, user)
+    on = clock.today()
+    rows, subtotal, gst_total = _priced_rows(payload.get("items", []))
+    total = subtotal + gst_total
+    po_no = payload.get("po_no") or f"{on:%Y%m%d}-{secrets.randbelow(10000):04d}"
+    pdf = pdfs.purchase_order_pdf(
+        shop=who["shop"], owner=who["owner"], supplier=supplier, lines=rows,
+        subtotal=subtotal, gst=gst_total, total=total, po_no=po_no, on=on,
+        gstin=who["gstin"], phone=who["phone"], address=who["address"])
+    doc = documents.store(user["user_id"], "purchase_order", f"po-{po_no}.pdf", pdf)
+    return doc
+
+
 # /api/reset was removed with the move to multi-tenancy. It called seed.main(),
 # which rewrites the JSON files this app no longer reads, and there is no
 # sensible meaning for "reset" once several shops share one database — the

@@ -232,6 +232,199 @@ def bill_pdf(*, shop: str, owner: str, customer: dict, lines: list,
     return buf.getvalue()
 
 
+def _party_block(c, w, y, label, party, right_label, doc_no):
+    c.setFont("Helvetica-Bold", 8.5)
+    c.setFillColor(MUTED)
+    c.drawString(18 * mm, y, label)
+    c.drawRightString(w - 18 * mm, y, right_label)
+    y -= 5 * mm
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(18 * mm, y, (party or {}).get("name") or "—")
+    c.setFont("Helvetica", 9)
+    c.drawRightString(w - 18 * mm, y, f"No.  {doc_no}")
+    y -= 4.6 * mm
+    c.setFont("Helvetica", 9)
+    if (party or {}).get("phone"):
+        c.drawString(18 * mm, y, party["phone"])
+    return y
+
+
+def _item_table_rows(c, w, y, h, lines: list, with_money: bool) -> float:
+    """Shared item table renderer. `with_money` draws rate/amount columns;
+    otherwise (delivery challan) only qty/unit are shown — a challan moves
+    goods, it does not charge for them."""
+    cols = (18 * mm, 108 * mm, 133 * mm, w - 18 * mm)
+    c.setFillColor(colors.HexColor("#f3f5f7"))
+    c.rect(18 * mm, y - 2 * mm, w - 36 * mm, 7 * mm, stroke=0, fill=1)
+    c.setFillColor(MUTED)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(cols[0] + 2 * mm, y, "ITEM")
+    c.drawRightString(cols[1], y, "QTY")
+    if with_money:
+        c.drawRightString(cols[2], y, "RATE")
+        c.drawRightString(cols[3] - 2 * mm, y, "AMOUNT")
+    y -= 8 * mm
+
+    c.setFillColor(INK)
+    for it in lines:
+        c.setFont("Helvetica", 9)
+        name = it["name"]
+        while c.stringWidth(name, "Helvetica", 9) > 84 * mm and len(name) > 4:
+            name = name[:-2]
+        if name != it["name"]:
+            name += "…"
+        c.drawString(cols[0] + 2 * mm, y, name)
+        c.drawRightString(cols[1], y, f"{_qty(it['qty'])} {it.get('unit', '')}")
+        if with_money:
+            c.drawRightString(cols[2], y, money(it.get("rate")) if it.get("rate") else "—")
+            c.drawRightString(cols[3] - 2 * mm, y, money(it["amount"]))
+        y -= 6.4 * mm
+        if y < 70 * mm:
+            c.showPage()
+            y = h - 30 * mm
+    return y
+
+
+def challan_pdf(*, shop: str, owner: str, customer: dict, lines: list,
+                challan_no: str, on: date, gstin: str = "", phone: str = "",
+                address: str = "", vehicle_no: str = "") -> bytes:
+    """Delivery challan: goods move, no charge is made on the document itself
+    (that happens on the tax invoice, separately)."""
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    w, h = A4
+    y = _letterhead(c, w, h - 18 * mm, shop, owner, gstin, phone, address,
+                    "DELIVERY CHALLAN")
+    y = _party_block(c, w, y, "DELIVER TO", customer, "CHALLAN DETAILS", challan_no)
+    c.drawRightString(w - 18 * mm, y,
+                      f"Date  {on.strftime('%d %b %Y') if hasattr(on, 'strftime') else on}")
+    y -= 6 * mm
+    if vehicle_no:
+        c.setFont("Helvetica", 9)
+        c.drawString(18 * mm, y, f"Vehicle No: {vehicle_no}")
+        y -= 6 * mm
+    y -= 4 * mm
+
+    y = _item_table_rows(c, w, y, h, lines, with_money=False)
+
+    c.setStrokeColor(LINE)
+    c.line(18 * mm, y + 2 * mm, w - 18 * mm, y + 2 * mm)
+    y -= 8 * mm
+    c.setFont("Helvetica-Oblique", 8)
+    c.setFillColor(MUTED)
+    c.drawString(18 * mm, y,
+                 "Goods dispatched as per above. Not a tax invoice — no charge "
+                 "is made on this document.")
+    y -= 10 * mm
+    _seal(c, w - 64 * mm, max(y - 26 * mm, 24 * mm), shop, owner)
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+def _priced_document_pdf(*, shop: str, owner: str, customer: dict, lines: list,
+                         subtotal: float, gst: float, total: float, doc_no: str,
+                         on: date, title: str, footer_note: str,
+                         party_label: str = "BILL TO", gstin: str = "",
+                         phone: str = "", address: str = "",
+                         extra_line: str = "") -> bytes:
+    """Shared renderer for quotation / proforma invoice / purchase order — all
+    three are a priced line-item document that is deliberately NOT a tax
+    invoice (or, for a PO, is the buyer's own order rather than a bill at
+    all). Kept as one function so the three stay visually consistent."""
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    w, h = A4
+    y = _letterhead(c, w, h - 18 * mm, shop, owner, gstin, phone, address, title)
+    y = _party_block(c, w, y, party_label, customer, "DETAILS", doc_no)
+    c.drawRightString(w - 18 * mm, y,
+                      f"Date  {on.strftime('%d %b %Y') if hasattr(on, 'strftime') else on}")
+    y -= 6 * mm
+    if extra_line:
+        c.setFont("Helvetica", 9)
+        c.drawString(18 * mm, y, extra_line)
+        y -= 6 * mm
+    y -= 4 * mm
+
+    y = _item_table_rows(c, w, y, h, lines, with_money=True)
+
+    c.setStrokeColor(LINE)
+    c.line(18 * mm, y + 2 * mm, w - 18 * mm, y + 2 * mm)
+    y -= 4 * mm
+
+    def total_row(label, value, bold=False, size=9):
+        nonlocal y
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+        c.drawRightString(w - 48 * mm, y, label)
+        c.drawRightString(w - 18 * mm, y, value)
+        y -= 5.4 * mm
+
+    total_row("Taxable value", money(subtotal))
+    if gst:
+        total_row("CGST", money(gst / 2))
+        total_row("SGST", money(gst / 2))
+    y -= 1 * mm
+    c.setStrokeColor(LINE)
+    c.line(w - 78 * mm, y + 3 * mm, w - 18 * mm, y + 3 * mm)
+    y -= 2 * mm
+    c.setFillColor(ACCENT)
+    total_row("TOTAL", "Rs " + money(total), bold=True, size=11)
+    c.setFillColor(INK)
+
+    y -= 2 * mm
+    c.setFont("Helvetica-Oblique", 8)
+    c.setFillColor(MUTED)
+    c.drawString(18 * mm, y, "Amount in words: " + amount_in_words(total))
+    y -= 8 * mm
+    c.drawString(18 * mm, y, footer_note)
+    y -= 10 * mm
+
+    _seal(c, w - 64 * mm, max(y - 26 * mm, 24 * mm), shop, owner)
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+def quotation_pdf(*, shop: str, owner: str, customer: dict, lines: list,
+                  subtotal: float, gst: float, total: float, quote_no: str,
+                  on: date, valid_until: str = None, gstin: str = "",
+                  phone: str = "", address: str = "") -> bytes:
+    extra = f"Valid until: {valid_until}" if valid_until else ""
+    return _priced_document_pdf(
+        shop=shop, owner=owner, customer=customer, lines=lines,
+        subtotal=subtotal, gst=gst, total=total, doc_no=quote_no, on=on,
+        title="QUOTATION", party_label="QUOTE TO", gstin=gstin, phone=phone,
+        address=address, extra_line=extra,
+        footer_note="Prices quoted are estimates and subject to confirmation "
+                    "at the time of order.")
+
+
+def proforma_pdf(*, shop: str, owner: str, customer: dict, lines: list,
+                 subtotal: float, gst: float, total: float, proforma_no: str,
+                 on: date, gstin: str = "", phone: str = "",
+                 address: str = "") -> bytes:
+    return _priced_document_pdf(
+        shop=shop, owner=owner, customer=customer, lines=lines,
+        subtotal=subtotal, gst=gst, total=total, doc_no=proforma_no, on=on,
+        title="PROFORMA INVOICE", party_label="BILL TO", gstin=gstin,
+        phone=phone, address=address,
+        footer_note="This is a proforma invoice for reference only — not a "
+                    "demand for payment, and not a tax invoice under GST.")
+
+
+def purchase_order_pdf(*, shop: str, owner: str, supplier: dict, lines: list,
+                       subtotal: float, gst: float, total: float, po_no: str,
+                       on: date, gstin: str = "", phone: str = "",
+                       address: str = "") -> bytes:
+    return _priced_document_pdf(
+        shop=shop, owner=owner, customer=supplier, lines=lines,
+        subtotal=subtotal, gst=gst, total=total, doc_no=po_no, on=on,
+        title="PURCHASE ORDER", party_label="SUPPLIER", gstin=gstin,
+        phone=phone, address=address,
+        footer_note="Please supply the goods above against this purchase order.")
+
+
 def _by_item(lines: list) -> list:
     """Collapse a period's sale lines to one row per product.
 
