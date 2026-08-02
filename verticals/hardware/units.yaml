@@ -12,3 +12,4 @@ sqft: {base: sqft, note: "tiles"}
 box: {base: box, note: "tile box, typically covers ~1-1.5 sqm"}
 litre: {base: litre, note: "paint"}
 metre: {base: metre, note: "wire by the metre"}
+bucket: {base: litre, note: "paint bucket, commonly 20 litre"}

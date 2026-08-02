@@ -277,6 +277,13 @@ class JsonRepo(Repo):
                 config["gst_default"] = patch["gst_default"]
             if "gst_by_family" in patch:
                 config.setdefault("gst_by_family", {}).update(patch["gst_by_family"])
+            # vertical_id/vertical_pack_version: shipped-pack pointer written by
+            # verticals.seed_tenant(), same pass-through treatment as gst_default
+            # above rather than the Settings-page whitelist below.
+            if "vertical_id" in patch:
+                config["vertical_id"] = patch["vertical_id"]
+            if "vertical_pack_version" in patch:
+                config["vertical_pack_version"] = patch["vertical_pack_version"]
             for key in self._SETTING_KEYS:
                 if key in patch:
                     config[key] = patch[key]
