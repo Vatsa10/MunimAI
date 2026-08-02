@@ -98,7 +98,11 @@ class CatalogueSeedTests(unittest.TestCase):
 
     def test_brands_are_from_the_real_indian_roster(self):
         allowed = {"UltraTech", "Ambuja", "ACC", "Shree", "Dalmia",
-                  "Tata Tiscon", "JSW Neosteel", "SAIL", "Vizag",
+                  # Tata Tiscon and JSW Neosteel are TMT rebar brand lines and
+                  # must not appear on structural sections; Jindal and JSW roll
+                  # angles and channels to IS 2062 / IS 808.
+                  "Tata Tiscon", "JSW Neosteel", "Jindal", "JSW",
+                  "SAIL", "Vizag",
                   "Havells", "Polycab", "Finolex", "RR Kabel",
                   "Century", "Greenply", "Kajaria", "Somany",
                   "Supreme", "Astral", "Asian Paints", "Berger",

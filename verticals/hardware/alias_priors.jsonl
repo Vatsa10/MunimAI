@@ -18,8 +18,8 @@
 {"phrase": "ek inch pipe", "sku_ref": "PIPE_SUPREME_1", "attributes": {}}
 {"phrase": "safed paint", "sku_ref": "PAINT_ASIANPAINTS_INTERIOREMULSION", "attributes": {}}
 {"phrase": "bahar wala paint", "sku_ref": "PAINT_ASIANPAINTS_EXTERIOREMULSION", "attributes": {}}
-{"phrase": "kone wala loha", "sku_ref": "STEEL_TATATISCON_ANGLE_25X25X3", "attributes": {}}
-{"phrase": "channel patti", "sku_ref": "STEEL_TATATISCON_CHANNEL_75X40", "attributes": {}}
+{"phrase": "kone wala loha", "sku_ref": "STEEL_JINDAL_ANGLE_25X25X3", "attributes": {}}
+{"phrase": "channel patti", "sku_ref": "STEEL_JINDAL_CHANNEL_75X40", "attributes": {}}
 {"phrase": "ambuja bori", "sku_ref": "CEM_AMBUJA_OPC43", "attributes": {}}
 {"phrase": "acc bori", "sku_ref": "CEM_ACC_OPC43", "attributes": {}}
 {"phrase": "shree cement bori", "sku_ref": "CEM_SHREE_OPC43", "attributes": {}}
