@@ -4857,7 +4857,243 @@ start();
 <!-- @endsection:accounting -->
 
 <!-- @section:offline -->
-<!-- Sub-project C: service worker, IndexedDB outbox, offline state. -->
+<!-- Sub-project C: service worker, IndexedDB outbox, offline state.
+
+     Single-file, no-build-step constraint (spec 5.2): everything below is
+     hand-rolled vanilla JS — no idb wrapper, no ULID package, no TypeScript.
+     That is a deliberate compromise, not an oversight; see the sub-project C
+     report for what it costs. -->
+<link id="munimManifestLink" rel="manifest" href="/manifest.webmanifest">
+
+<div id="offlineBanner"
+     class="hidden fixed top-0 inset-x-0 z-[60] bg-amber-700 text-white text-sm
+            font-semibold text-center py-1.5 px-3">
+  Offline — sale entry, bill print, stock aur dues abhi bhi kaam karte hain.
+  <span id="offlineOutboxCount"></span>
+  Baaki (invoice scan, WhatsApp, dashboard) internet aane par chalega.
+</div>
+
+<div id="quickEntryFallback"
+     class="hidden fixed bottom-20 right-4 z-50 w-80 max-w-[92vw] bg-slate-900
+            border border-amber-600 rounded-xl shadow-xl p-3 text-sm text-slate-100">
+  <div class="flex items-center justify-between mb-2">
+    <b>Quick entry (voice ke bina)</b>
+    <button type="button" onclick="hideQuickEntryFallback()"
+            class="text-slate-400 hover:text-white">&times;</button>
+  </div>
+  <p class="text-xs text-slate-400 mb-2">
+    Voice abhi available nahi hai — item type karke bill banao. Yeh entry
+    turant local mein save hogi aur internet aane par sync ho jayegi.
+  </p>
+  <div class="grid grid-cols-2 gap-2">
+    <select id="qeItem" class="col-span-2 rounded bg-slate-800 px-2 py-1">
+      <option value="">Item chuno...</option>
+    </select>
+    <input id="qeQty" type="number" placeholder="Qty" class="rounded bg-slate-800 px-2 py-1">
+    <input id="qeUnit" placeholder="Unit" class="rounded bg-slate-800 px-2 py-1">
+    <input id="qeRate" type="number" placeholder="Rate (optional)" class="rounded bg-slate-800 px-2 py-1">
+    <select id="qePayment" class="rounded bg-slate-800 px-2 py-1">
+      <option value="cash">Cash</option>
+      <option value="credit">Credit</option>
+    </select>
+  </div>
+  <button type="button" onclick="submitQuickEntry()"
+          class="mt-2 w-full rounded bg-emerald-700 hover:bg-emerald-600 py-1.5 font-semibold">
+    Save (queue)
+  </button>
+</div>
+
+<script>
+// ================= PWA install shell =================
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
+
+// ================= Offline outbox (IndexedDB) =================
+// Ledger replay stays server-side (spec 5.4) — this module only ever adds a
+// small net delta for the few SKUs a queued sale/delivery touches on top of
+// whatever the last snapshot showed. It never re-sorts or re-derives history.
+const MUNIM_OUTBOX_DB = 'munim_outbox';
+const MUNIM_OUTBOX_STORE = 'events';
+
+function outboxOpenDb(){
+  return new Promise((resolve, reject)=>{
+    if(!('indexedDB' in window)){ reject(new Error('no indexeddb')); return; }
+    const req = indexedDB.open(MUNIM_OUTBOX_DB, 1);
+    req.onupgradeneeded = ()=>{
+      const db = req.result;
+      if(!db.objectStoreNames.contains(MUNIM_OUTBOX_STORE)){
+        db.createObjectStore(MUNIM_OUTBOX_STORE, {keyPath:'event_id'});
+      }
+    };
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+
+// A tiny Crockford-ish ULID: 48-bit millis + 80 bits of randomness, base32.
+// Not a spec-perfect ULID library — good enough for a client-generated id
+// that is unique enough and sorts roughly by time. See report: this is the
+// hand-rolled compromise the no-build-step constraint forces.
+function outboxUlid(){
+  const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  let ts = Date.now();
+  let tsStr = '';
+  for(let i=0;i<10;i++){ tsStr = ALPHABET[ts % 32] + tsStr; ts = Math.floor(ts/32); }
+  let rand = '';
+  for(let i=0;i<16;i++){ rand += ALPHABET[Math.floor(Math.random()*32)]; }
+  return tsStr + rand;
+}
+
+async function outboxAdd(event){
+  const db = await outboxOpenDb();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(MUNIM_OUTBOX_STORE, 'readwrite');
+    tx.objectStore(MUNIM_OUTBOX_STORE).put(event);
+    tx.oncomplete = ()=>resolve(event);
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+
+async function outboxAll(){
+  const db = await outboxOpenDb();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(MUNIM_OUTBOX_STORE, 'readonly');
+    const req = tx.objectStore(MUNIM_OUTBOX_STORE).getAll();
+    req.onsuccess = ()=>resolve(req.result||[]);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+
+async function outboxRemove(eventIds){
+  const db = await outboxOpenDb();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(MUNIM_OUTBOX_STORE, 'readwrite');
+    const store = tx.objectStore(MUNIM_OUTBOX_STORE);
+    eventIds.forEach(id=>store.delete(id));
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+
+// Queue a sale/delivery/etc event while offline (or as a resilience path even
+// online — flushOutbox reconciles either way). Billing never blocks on
+// whether this succeeds online first; it always goes through the queue.
+async function queueOfflineEvent(partialEvent){
+  const event = Object.assign({
+    event_id: outboxUlid(),
+    occurred_on: (window.STATE && STATE.today) || new Date().toISOString().slice(0,10),
+    precision: 'exact',
+    source: 'offline_outbox',
+  }, partialEvent);
+  await outboxAdd(event);
+  updateOfflineBannerCount();
+  flushOutbox(); // no-op if offline; harmless if online and it just succeeds
+  return event;
+}
+
+let munimOutboxFlushing = false;
+async function flushOutbox(){
+  if(munimOutboxFlushing || !navigator.onLine) return;
+  munimOutboxFlushing = true;
+  try{
+    const queued = await outboxAll();
+    if(!queued.length) return;
+    const out = await api('/api/sync/outbox', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({events: queued}),
+    });
+    // "accepted" or "duplicate" both mean the server already has it — either
+    // is safe to drop locally. Only a genuine failure stays queued.
+    const settled = (out.results||[])
+      .filter(r=>r.status==='accepted'||r.status==='duplicate')
+      .map(r=>r.event_id);
+    if(settled.length) await outboxRemove(settled);
+  }catch(e){
+    // Stays queued; next reconnect or manual retry tries again.
+  }finally{
+    munimOutboxFlushing = false;
+    updateOfflineBannerCount();
+  }
+}
+
+async function updateOfflineBannerCount(){
+  try{
+    const queued = await outboxAll();
+    const el = document.getElementById('offlineOutboxCount');
+    if(el) el.textContent = queued.length ? `(${queued.length} pending sync)` : '';
+  }catch(e){}
+}
+
+// ================= Offline UI state =================
+// Sale entry, bill print, stock lookup and customer dues stay usable offline
+// (spec 5.1). Invoice digitisation, WhatsApp send and dashboards do not — the
+// banner text says so rather than letting those calls fail silently.
+function setOfflineBannerVisible(visible){
+  const b = document.getElementById('offlineBanner');
+  if(b) b.classList.toggle('hidden', !visible);
+  document.body.classList.toggle('munim-offline', visible);
+}
+function refreshOfflineState(){
+  setOfflineBannerVisible(!navigator.onLine);
+  updateOfflineBannerCount();
+}
+window.addEventListener('online', ()=>{ refreshOfflineState(); flushOutbox(); });
+window.addEventListener('offline', refreshOfflineState);
+document.addEventListener('DOMContentLoaded', refreshOfflineState);
+refreshOfflineState();
+
+// ================= Voice degradation: typed quick-entry fallback =================
+// Billing must never block on voice availability (spec 5.6). Call this
+// wherever the app currently gives up because the mic/Samvaad session is
+// unavailable — offline is the most common case, but a Samvaad failure while
+// online should show it too.
+function populateQuickEntryItems(){
+  const sel = document.getElementById('qeItem');
+  if(!sel || typeof STATE==='undefined') return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Item chuno...</option>' +
+    (STATE.catalogue||[]).map(s=>`<option value="${s.sku_id}">${escHtml(s.canonical)}</option>`).join('');
+  if(current) sel.value = current;
+}
+function showQuickEntryFallback(){
+  populateQuickEntryItems();
+  const el = document.getElementById('quickEntryFallback');
+  if(el) el.classList.remove('hidden');
+}
+function hideQuickEntryFallback(){
+  const el = document.getElementById('quickEntryFallback');
+  if(el) el.classList.add('hidden');
+}
+async function submitQuickEntry(){
+  const skuId = (document.getElementById('qeItem')||{}).value||'';
+  const qty = parseFloat((document.getElementById('qeQty')||{}).value);
+  const sku = (typeof STATE!=='undefined' && STATE.byId) ? STATE.byId[skuId] : null;
+  const unit = (document.getElementById('qeUnit')||{}).value || (sku && sku.default_unit) || 'unit';
+  const rateRaw = (document.getElementById('qeRate')||{}).value;
+  const payment = (document.getElementById('qePayment')||{}).value||'cash';
+  // The item list comes from the catalogue cached at last boot (spec 5.1
+  // covers stock lookup offline, so this list is already on the device) —
+  // free-typed product names are not accepted here because resolving a
+  // spoken/typed phrase to a sku_id is the matcher's job (matcher.py) and
+  // stays server-side; an offline write needs a sku_id it can trust.
+  if(!skuId || !qty){ if(typeof toast==='function') toast('Item aur qty zaroori hai.', false); return; }
+  await queueOfflineEvent({
+    type: 'sale', sku_id: skuId,
+    qty: qty, unit: unit,
+    rate: rateRaw ? parseFloat(rateRaw) : null,
+    payment: payment,
+  });
+  if(typeof toast==='function') toast('Entry queue ho gayi. Sync hoga jab internet aayega.');
+  hideQuickEntryFallback();
+}
+
+// Offline implies voice cannot run at all — surface the fallback
+// automatically rather than waiting for a failed mic tap.
+window.addEventListener('offline', showQuickEntryFallback);
+</script>
 <!-- @endsection:offline -->
 
 </body>
