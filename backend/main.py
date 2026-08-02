@@ -76,9 +76,29 @@ def current_user() -> dict:
 
 
 def bind_user(user: dict):
-    """Attach a user (and their ledger) to this request."""
+    """Attach a user (and their ledger) to this request.
+
+    A staff account's `ledger_user_id` points at the shop owner's tenant, so
+    a cashier's sale lands in the owner's books, not a tenant of their own.
+    """
     _CURRENT_USER.set(user)
-    _CURRENT.set(sqlrepo.SqlRepo(user["user_id"]))
+    _CURRENT.set(sqlrepo.SqlRepo(user.get("ledger_user_id") or user["user_id"]))
+
+
+def _require_role(action: str) -> None:
+    """B4 — server-side role enforcement, checked in the handler itself so a
+    replayed request (not just a hidden UI button) is actually refused.
+    Staff accounts carry a `role`; an account with none is the original owner
+    flow and defaults to full access, so existing single-user shops are
+    unaffected."""
+    import permissions
+    user = current_user()
+    role = user.get("role") or permissions.DEFAULT_ROLE
+    try:
+        permissions.require(role, action)
+    except permissions.PermissionDenied:
+        raise HTTPException(
+            403, f"Your role ({role}) does not have permission to do this.")
 
 # uvicorn loads this file as the package module "backend.main", but it also
 # inserts backend/ onto sys.path (above) so that bare imports like
@@ -647,6 +667,7 @@ def get_config():
 
 @app.post("/api/config")
 def set_config(payload: dict = Body(...)):
+    _require_role("settings")
     repo.save_config(payload)
     return repo.load_config()
 
@@ -931,6 +952,7 @@ def update_customer(customer_id: str, payload: dict = Body(...)):
 
 @app.delete("/api/customers/{customer_id}")
 def delete_customer(customer_id: str):
+    _require_role("delete")
     if not repo.customer(customer_id):
         raise HTTPException(404, "Customer not found.")
     if not repo.delete_customer(customer_id):
@@ -1100,6 +1122,7 @@ def update_stock_item(sku_id: str, payload: dict = Body(...)):
 
 @app.delete("/api/stock/{sku_id}")
 def delete_stock_item(sku_id: str):
+    _require_role("delete")
     sku = repo.sku(sku_id)
     if not sku:
         raise HTTPException(404, "Product inventory mein nahi mila.")
@@ -1560,6 +1583,55 @@ def bill(payload: dict = Body(...)):
     return Response(
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="bill-{bill_no}.pdf"'})
+
+
+# ---------------------------------------------------------------------------
+# B4 — staff accounts (roles) and thermal print layouts.
+# ---------------------------------------------------------------------------
+@app.post("/api/staff")
+def create_staff(payload: dict = Body(...)):
+    _require_role("manage_staff")
+    user = current_user()
+    try:
+        return auth.create_staff(
+            user.get("ledger_user_id") or user["user_id"], payload.get("phone"),
+            payload.get("name"), payload.get("password"), payload.get("role"))
+    except (ValueError, auth.AccountExists) as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/staff")
+def list_staff():
+    _require_role("manage_staff")
+    user = current_user()
+    return auth.staff_for_owner(user.get("ledger_user_id") or user["user_id"])
+
+
+@app.post("/api/bill/thermal")
+def bill_thermal(payload: dict = Body(...)):
+    """58mm/80mm thermal receipt — same line items as /api/bill, printer-width
+    layout instead of A4."""
+    import notify
+    import pdfs
+    user = current_user()
+    width = int(payload.get("width_mm") or 58)
+    customer = payload.get("customer") or {}
+    if customer.get("customer_id") and not customer.get("name"):
+        customer = repo.customer(customer["customer_id"]) or customer
+    who = notify._identity(repo, user)
+    on = clock.today()
+    rows, subtotal, gst_total = _priced_rows(payload.get("items", []))
+    total = subtotal + gst_total
+    bill_no = payload.get("bill_no") or f"{on:%Y%m%d}-{int(total) % 10000:04d}"
+    payment = payload.get("payment") or "cash"
+    pdf = pdfs.thermal_bill_pdf(
+        width_mm=width, shop=who["shop"], owner=who["owner"], customer=customer,
+        lines=rows, subtotal=subtotal, gst=gst_total, total=total,
+        bill_no=bill_no, on=on, payment=payment, gstin=who["gstin"],
+        phone=who["phone"])
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="bill-{bill_no}-{width}mm.pdf"'})
 
 
 # ---------------------------------------------------------------------------

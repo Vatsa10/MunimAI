@@ -425,6 +425,94 @@ def purchase_order_pdf(*, shop: str, owner: str, supplier: dict, lines: list,
         footer_note="Please supply the goods above against this purchase order.")
 
 
+def thermal_bill_pdf(*, width_mm: int, shop: str, owner: str, customer: dict,
+                     lines: list, subtotal: float, gst: float, total: float,
+                     bill_no: str, on: date, payment: str, gstin: str = "",
+                     phone: str = "") -> bytes:
+    """58mm or 80mm thermal receipt. Height is sized to content rather than
+    a fixed A4 page — a thermal printer feeds a continuous roll, so there's
+    no "page" to fill or overflow, only a cut point at the end."""
+    if width_mm not in (58, 80):
+        raise ValueError("width_mm must be 58 or 80")
+    w = width_mm * mm
+    margin = 3 * mm
+    line_h = 4.2 * mm
+    # Rough content-height estimate: header + item rows + totals + footer.
+    h = (52 * mm) + len(lines) * line_h + 30 * mm
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(w, h))
+    y = h - 6 * mm
+
+    def center(text, size=9, bold=True):
+        nonlocal y
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+        c.drawCentredString(w / 2, y, text)
+        y -= line_h
+
+    center((shop or "").upper(), 10)
+    if owner:
+        center(owner, 7, bold=False)
+    if gstin:
+        center(f"GSTIN {gstin}", 6.5, bold=False)
+    if phone:
+        center(phone, 6.5, bold=False)
+    y -= 1 * mm
+    c.setDash(1, 1)
+    c.line(margin, y, w - margin, y)
+    c.setDash()
+    y -= line_h
+
+    c.setFont("Helvetica", 7)
+    c.drawString(margin, y, f"Bill {bill_no}")
+    c.drawRightString(w - margin, y,
+                      on.strftime("%d-%b-%y") if hasattr(on, "strftime") else str(on))
+    y -= line_h
+    if customer.get("name"):
+        c.drawString(margin, y, customer["name"][:32])
+        y -= line_h
+    c.line(margin, y, w - margin, y)
+    y -= line_h
+
+    c.setFont("Helvetica", 6.5)
+    for it in lines:
+        name = it["name"]
+        max_chars = 30 if width_mm == 80 else 22
+        if len(name) > max_chars:
+            name = name[:max_chars - 1] + "…"
+        c.drawString(margin, y, name)
+        y -= line_h * 0.75
+        c.drawString(margin, y, f"{_qty(it['qty'])} {it.get('unit','')} x "
+                                f"{money(it.get('rate')) if it.get('rate') else '-'}")
+        c.drawRightString(w - margin, y, money(it["amount"]))
+        y -= line_h
+
+    c.line(margin, y, w - margin, y)
+    y -= line_h
+    c.setFont("Helvetica", 7)
+    c.drawString(margin, y, "Taxable")
+    c.drawRightString(w - margin, y, money(subtotal))
+    y -= line_h * 0.9
+    if gst:
+        c.drawString(margin, y, "CGST")
+        c.drawRightString(w - margin, y, money(gst / 2))
+        y -= line_h * 0.9
+        c.drawString(margin, y, "SGST")
+        c.drawRightString(w - margin, y, money(gst / 2))
+        y -= line_h * 0.9
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(margin, y, "TOTAL")
+    c.drawRightString(w - margin, y, "Rs " + money(total))
+    y -= line_h
+    c.setFont("Helvetica", 6.5)
+    c.drawString(margin, y, "PAID CASH" if payment == "cash" else "ON CREDIT")
+    y -= line_h * 1.4
+    center("Thank you — visit again", 6.5, bold=False)
+
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
 def _by_item(lines: list) -> list:
     """Collapse a period's sale lines to one row per product.
 
