@@ -290,6 +290,10 @@ def onboarding(payload: dict = Body(...)):
 # ---------------------------------------------------------------------------
 @app.post("/api/send/bill")
 def send_bill(payload: dict = Body(...)):
+    # Deliberately left open to staff ("sale"): sending the bill for the sale
+    # just made is part of completing that sale, not a separate privileged
+    # action — see the commit message. Bulk/aggregate sends below require
+    # "write".
     import notify
     customer = payload.get("customer") or {}
     if customer.get("customer_id") and not customer.get("phone"):
@@ -307,6 +311,11 @@ def send_bill(payload: dict = Body(...)):
 
 @app.post("/api/send/summary")
 def send_summary(payload: dict = Body(...)):
+    # Business-summary and dunning sends are an owner/manager judgment call,
+    # not routine sale completion — see the commit message for the reasoning
+    # (sending the bill for the sale just made stays open to staff; sending
+    # the shop's aggregate figures or chasing outstanding credit does not).
+    _require_role("write")
     import notify
     period = "week" if payload.get("period") == "week" else "day"
     try:
@@ -333,6 +342,10 @@ def send_reminders(payload: dict = Body(default={}),
             out.append({"user": u["phone"],
                         **notify.send_due_reminders(repo, u, days_before=days)})
         return {"runs": out}
+    # Bulk dunning is a manager/owner call, not a staff one — same reasoning
+    # as /api/send/summary. The cron branch above is unaffected: it has no
+    # logged-in user/role at all, only the scheduler's own secret.
+    _require_role("write")
     return notify.send_due_reminders(repo, current_user(), days_before=days)
 
 
@@ -933,6 +946,7 @@ def customers():
 
 @app.post("/api/customers")
 def save_customer(payload: dict = Body(...)):
+    _require_role("write")
     try:
         return repo.upsert_customer(payload.get("phone", ""), payload.get("name", ""))
     except ValueError as e:
@@ -941,6 +955,7 @@ def save_customer(payload: dict = Body(...)):
 
 @app.patch("/api/customers/{customer_id}")
 def update_customer(customer_id: str, payload: dict = Body(...)):
+    _require_role("write")
     if not repo.customer(customer_id):
         raise HTTPException(404, "Customer not found.")
     try:
@@ -987,6 +1002,8 @@ def record_payment(customer_id: str, payload: dict = Body(...)):
 
 @app.post("/api/customers/{customer_id}/reminder")
 def send_customer_reminder(customer_id: str):
+    # Dunning, same reasoning as bulk reminders/summary above.
+    _require_role("write")
     import notify
     if not repo.customer(customer_id):
         raise HTTPException(404, "Customer not found.")
@@ -1097,6 +1114,7 @@ def stock(as_of: str = None):
 
 @app.post("/api/stock")
 def add_stock_item(payload: dict = Body(...)):
+    _require_role("write")
     import agent as AGENT
     attributes = dict(payload.get("attributes") or {})
     if payload.get("type"):
@@ -1110,6 +1128,7 @@ def add_stock_item(payload: dict = Body(...)):
 
 @app.patch("/api/stock/{sku_id}")
 def update_stock_item(sku_id: str, payload: dict = Body(...)):
+    _require_role("write")
     import agent as AGENT
     if not repo.sku(sku_id):
         raise HTTPException(404, "Product inventory mein nahi mila.")
@@ -1658,6 +1677,7 @@ async def catalogue_import_preview(file: UploadFile = File(...)):
 
 @app.post("/api/catalogue/import/commit")
 async def catalogue_import_commit(file: UploadFile = File(...)):
+    _require_role("write")
     import catalogue_import as CI
     content = await file.read()
     rows = CI.parse_rows(content, file.filename or "")
@@ -1666,6 +1686,7 @@ async def catalogue_import_commit(file: UploadFile = File(...)):
 
 @app.post("/api/customers/{customer_id}/price-tier")
 def set_customer_price_tier(customer_id: str, payload: dict = Body(...)):
+    _require_role("write")
     tier = payload.get("tier")
     if tier not in ("retail", "contractor", "dealer"):
         return Response(status_code=400,
@@ -1689,6 +1710,7 @@ def set_customer_price_tier(customer_id: str, payload: dict = Body(...)):
 # ---------------------------------------------------------------------------
 @app.post("/api/accounting/sales-return")
 def accounting_sales_return(payload: dict = Body(...)):
+    _require_role("write")
     return _write_events("sales_return", payload.get("items", []),
                          payload.get("occurred_on") or clock.today().isoformat(),
                          payload.get("precision", "exact"), "manual",
@@ -1697,6 +1719,7 @@ def accounting_sales_return(payload: dict = Body(...)):
 
 @app.post("/api/accounting/credit-note")
 def accounting_credit_note(payload: dict = Body(...)):
+    _require_role("write")
     return _write_events("credit_note", payload.get("items", []),
                          payload.get("occurred_on") or clock.today().isoformat(),
                          payload.get("precision", "exact"), "manual",
@@ -1705,6 +1728,7 @@ def accounting_credit_note(payload: dict = Body(...)):
 
 @app.post("/api/accounting/debit-note")
 def accounting_debit_note(payload: dict = Body(...)):
+    _require_role("write")
     return _write_events("debit_note", payload.get("items", []),
                          payload.get("occurred_on") or clock.today().isoformat(),
                          payload.get("precision", "exact"), "manual",

@@ -62,6 +62,10 @@ class ServerSideEnforcementTests(unittest.TestCase):
                 return None
             def load_config(self):
                 return {}
+            def load_catalogue(self):
+                return []
+            def all_events(self):
+                return []
 
         fake_user = {"user_id": "usr_staff", "role": role,
                     "ledger_user_id": "usr_owner1"}
@@ -96,6 +100,95 @@ class ServerSideEnforcementTests(unittest.TestCase):
         resp = client.delete("/api/customers/cust_0001",
                              headers={"Authorization": "Bearer irrelevant"})
         self.assertEqual(resp.status_code, 200)
+
+    # -- write-capability regression coverage: a staff session replaying
+    # these requests directly (not through the UI) must be refused. --
+    def test_staff_cannot_create_a_customer(self):
+        client = self._client_as("staff")
+        resp = client.post("/api/customers", json={"phone": "9876543210",
+                                                    "name": "New Customer"},
+                           headers={"Authorization": "Bearer irrelevant"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_staff_cannot_edit_a_customer(self):
+        client = self._client_as("staff")
+        resp = client.patch("/api/customers/cust_0001",
+                            json={"phone": "9876543210", "name": "Renamed"},
+                            headers={"Authorization": "Bearer irrelevant"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_staff_cannot_add_a_stock_item(self):
+        client = self._client_as("staff")
+        resp = client.post("/api/stock", json={"name": "New Item"},
+                           headers={"Authorization": "Bearer irrelevant"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_staff_cannot_edit_a_stock_item(self):
+        client = self._client_as("staff")
+        resp = client.patch("/api/stock/s1", json={"selling_rate": 999},
+                            headers={"Authorization": "Bearer irrelevant"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_staff_cannot_set_a_customer_price_tier(self):
+        client = self._client_as("staff")
+        resp = client.post("/api/customers/cust_0001/price-tier",
+                           json={"tier": "contractor"},
+                           headers={"Authorization": "Bearer irrelevant"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_staff_cannot_commit_a_catalogue_import(self):
+        client = self._client_as("staff")
+        resp = client.post(
+            "/api/catalogue/import/commit",
+            files={"file": ("cat.csv", b"Name,Unit\nNails,kg\n", "text/csv")},
+            headers={"Authorization": "Bearer irrelevant"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_staff_cannot_record_a_sales_return(self):
+        client = self._client_as("staff")
+        resp = client.post("/api/accounting/sales-return",
+                           json={"items": []},
+                           headers={"Authorization": "Bearer irrelevant"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_staff_cannot_record_a_credit_note(self):
+        client = self._client_as("staff")
+        resp = client.post("/api/accounting/credit-note", json={"items": []},
+                           headers={"Authorization": "Bearer irrelevant"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_staff_cannot_record_a_debit_note(self):
+        client = self._client_as("staff")
+        resp = client.post("/api/accounting/debit-note", json={"items": []},
+                           headers={"Authorization": "Bearer irrelevant"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_staff_cannot_send_a_business_summary(self):
+        client = self._client_as("staff")
+        resp = client.post("/api/send/summary", json={"period": "day"},
+                           headers={"Authorization": "Bearer irrelevant"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_staff_cannot_send_bulk_reminders(self):
+        client = self._client_as("staff")
+        resp = client.post("/api/send/reminders", json={},
+                           headers={"Authorization": "Bearer irrelevant"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_staff_cannot_send_a_single_customer_reminder(self):
+        client = self._client_as("staff")
+        resp = client.post("/api/customers/cust_0001/reminder",
+                           headers={"Authorization": "Bearer irrelevant"})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_manager_can_record_a_credit_note(self):
+        # write is granted to manager — this only fails past the permission
+        # check (on a FakeRepo method the sale path doesn't provide), which
+        # proves the 403 above was actually about role, not about the route.
+        client = self._client_as("manager")
+        resp = client.post("/api/accounting/credit-note", json={"items": []},
+                           headers={"Authorization": "Bearer irrelevant"})
+        self.assertNotEqual(resp.status_code, 403)
 
 
 class ThermalPrintPdfTests(unittest.TestCase):
