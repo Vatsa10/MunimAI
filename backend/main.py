@@ -1553,12 +1553,19 @@ def bill(payload: dict = Body(...)):
     """
     import notify
     import pdfs
+    import hsn as HSN
+    import verticals
     user = current_user()
     customer = payload.get("customer") or {}
     if customer.get("customer_id") and not customer.get("name"):
         customer = repo.customer(customer["customer_id"]) or customer
     who = notify._identity(repo, user)
     on = clock.today()
+
+    # B5: HSN per line, from the SKU's own attributes or the loaded vertical
+    # pack's category default — blank if neither is present.
+    vertical_id, _ver = verticals.tenant_vertical(repo.load_config())
+    gst_map = HSN.load_gst_map(vertical_id)
 
     rows, subtotal, gst_total = [], 0.0, 0.0
     for it in payload.get("items", []):
@@ -1570,7 +1577,8 @@ def bill(payload: dict = Body(...)):
         gst_total += amount * float(repo.gst_rate_for(sku)) / 100.0
         subtotal += amount
         rows.append({"name": sku.get("canonical", it["sku_id"]), "qty": qty,
-                     "unit": unit, "rate": rate, "amount": amount})
+                     "unit": unit, "rate": rate, "amount": amount,
+                     "hsn": HSN.hsn_for_sku(sku, gst_map)})
     total = subtotal + gst_total
     bill_no = payload.get("bill_no") or f"{on:%Y%m%d}-{int(total) % 10000:04d}"
     payment = payload.get("payment") or (payload.get("items") or [{}])[0].get("payment") or "cash"
@@ -1579,7 +1587,8 @@ def bill(payload: dict = Body(...)):
         shop=who["shop"], owner=who["owner"], customer=customer, lines=rows,
         subtotal=subtotal, gst=gst_total, total=total, bill_no=bill_no, on=on,
         payment=payment, due_on=payload.get("payment_deadline"),
-        gstin=who["gstin"], phone=who["phone"], address=who["address"])
+        gstin=who["gstin"], phone=who["phone"], address=who["address"],
+        eway_bill_no=payload.get("eway_bill_no"))
     return Response(
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="bill-{bill_no}.pdf"'})

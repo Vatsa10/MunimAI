@@ -125,8 +125,16 @@ def _seal(c, x, y, shop, owner):
 def bill_pdf(*, shop: str, owner: str, customer: dict, lines: list,
              subtotal: float, gst: float, total: float, bill_no: str,
              on: date, payment: str, due_on: str = None, gstin: str = "",
-             phone: str = "", address: str = "") -> bytes:
-    """lines: [{name, qty, unit, rate, amount, gst_rate}]"""
+             phone: str = "", address: str = "",
+             eway_bill_no: str = None) -> bytes:
+    """lines: [{name, qty, unit, rate, amount, gst_rate, hsn}]
+
+    `hsn` per line is optional — a shop with no vertical pack and no manually
+    entered HSN simply shows the item name with no code, per B5's degrade
+    rule (hsn.py). `eway_bill_no`, if given, is printed; if the invoice total
+    exceeds the e-way bill threshold and no number was given, a reminder line
+    is printed instead — surfacing the requirement, not enforcing it.
+    """
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     w, h = A4
@@ -176,7 +184,13 @@ def bill_pdf(*, shop: str, owner: str, customer: dict, lines: list,
         c.drawRightString(cols[1], y, f"{_qty(it['qty'])} {it.get('unit', '')}")
         c.drawRightString(cols[2], y, money(it.get("rate")) if it.get("rate") else "—")
         c.drawRightString(cols[3] - 2 * mm, y, money(it["amount"]))
-        y -= 6.4 * mm
+        y -= 4.4 * mm
+        if it.get("hsn"):
+            c.setFont("Helvetica", 6.5)
+            c.setFillColor(MUTED)
+            c.drawString(cols[0] + 2 * mm, y, f"HSN {it['hsn']}")
+            c.setFillColor(INK)
+        y -= 2 * mm
         if y < 70 * mm:            # leave room for totals + seal
             c.showPage()
             y = h - 30 * mm
@@ -219,6 +233,21 @@ def bill_pdf(*, shop: str, owner: str, customer: dict, lines: list,
     if payment == "credit" and due_on:
         c.setFont("Helvetica", 9)
         c.drawString(18 * mm + 42 * mm, y, f"Payment due: {due_on}")
+    y -= 5 * mm
+
+    # B5 — e-way bill: surface the >Rs 50,000 requirement and the bill
+    # number if captured. No portal integration; this is display only.
+    from hsn import eway_bill_required
+    if eway_bill_no:
+        c.setFont("Helvetica", 8)
+        c.setFillColor(MUTED)
+        c.drawString(18 * mm, y, f"E-way Bill No: {eway_bill_no}")
+        c.setFillColor(INK)
+    elif eway_bill_required(total):
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColor(colors.HexColor("#a13a2f"))
+        c.drawString(18 * mm, y, "E-way bill required — invoice value exceeds Rs 50,000.")
+        c.setFillColor(INK)
 
     _seal(c, w - 64 * mm, 26 * mm, shop, owner)
     c.setFont("Helvetica", 7)
