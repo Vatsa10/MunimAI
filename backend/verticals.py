@@ -140,6 +140,13 @@ def _stamp_vertical_config(repo, vertical_id: str, version: str) -> None:
     "SELECT ... FOR UPDATE" / "INSERT ... ON CONFLICT" pattern sqlrepo.py's
     own save_config already uses for the same table - no schema change, no
     edit to sqlrepo.py, just a second writer using the table it already owns.
+
+    ponytail: this raw-SQL branch is a constraint-driven workaround, not a
+    design choice - it exists only because sqlrepo.py was frozen for the
+    parallel A/B/C build. Once that build merges, fold vertical_id/
+    vertical_pack_version into SqlRepo.save_config()'s own key list (same
+    treatment as gst_default) and delete this branch; a second writer against
+    a table SqlRepo already owns should not be permanent architecture.
     """
     user_id = getattr(repo, "user_id", None)
     if user_id is None:

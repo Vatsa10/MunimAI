@@ -17,6 +17,19 @@ PHRASES = [
     "asian paints", "berger paint", "structural angle",
 ]
 
+# Brand-led phrasing ("ultratech cement do bori") is the single most natural
+# way an owner names a product. A previous version of catalogue_seed.jsonl
+# put `brand` only at the SKU's top level, not inside `attributes`, so
+# matcher.resolve_variant (which compares spoken attrs against
+# sku["attributes"]) could never match a spoken brand and returned
+# not_stocked for every brand-led phrase. That was a silent, systemic
+# failure the old >=16/20 threshold let slip through. This list exists
+# specifically to catch that class of regression again.
+BRAND_LED_PHRASES = [
+    "ultratech cement", "tata tiscon", "ultratech ppc", "tata tiscon 12mm",
+    "havells wire", "century plywood", "supreme pipe",
+]
+
 
 class TwentyPhraseResolutionTests(unittest.TestCase):
     def setUp(self):
@@ -43,6 +56,19 @@ class TwentyPhraseResolutionTests(unittest.TestCase):
             else:
                 unresolved.append((phrase, result["status"]))
         self.assertGreaterEqual(resolved, 16, f"unresolved: {unresolved}")
+
+    def test_brand_led_phrases_never_come_back_not_stocked(self):
+        """Regression guard: brand alone must be a real, matchable attribute
+        (spec: attributes.brand), not just cosmetic top-level metadata."""
+        learning = {"aliases_learned": [], "attribute_priors": [],
+                    "unit_priors": [], "corrections": []}
+        failures = []
+        for phrase in BRAND_LED_PHRASES:
+            result = M.match(phrase, self.catalogue, learning,
+                             vertical_priors=self.pack["alias_priors"])
+            if result["status"] not in ("matched", "disambiguate"):
+                failures.append((phrase, result["status"]))
+        self.assertEqual(failures, [])
 
 
 if __name__ == "__main__":
