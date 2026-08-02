@@ -262,6 +262,15 @@ def onboarding(payload: dict = Body(...)):
         "address": address,
         "phone": user.get("phone") or "",
     })
+    # Hardware is the only vertical at launch, so a single-option control
+    # (spec 3.6) rather than a real chooser. Seeding is best-effort: a
+    # malformed pack must never fail signup itself.
+    vertical_id = (payload.get("vertical_id") or "hardware").strip() or "hardware"
+    import verticals
+    try:
+        verticals.seed_tenant(repo, vertical_id, "1.0.0")
+    except verticals.PackValidationError:
+        pass
     return {"ok": True}
 
 

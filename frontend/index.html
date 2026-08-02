@@ -2420,6 +2420,12 @@
             <label class="auth-label" for="obAddress">Business address <span style="font-weight:500;letter-spacing:0;text-transform:none">(optional)</span></label>
             <textarea id="obAddress" class="auth-input"
                       placeholder="Shop address for bills"></textarea>
+            <label class="auth-label">Business type</label>
+            <div class="auth-input" id="obVertical" style="display:flex;align-items:center;gap:8px;cursor:default">
+              <span class="material-symbols-outlined" style="font-size:20px">construction</span>
+              Hardware &amp; Building Materials
+            </div>
+            <input type="hidden" id="obVerticalId" value="hardware">
             <button class="auth-primary" onclick="submitOnboarding()" id="obBtn">Start operating →</button>
           </div>
           <!-- @endsection:onboarding -->
