@@ -1,0 +1,13 @@
+tmt_grade: ["Fe500", "Fe500D", "Fe550"]
+tmt_diameter_mm: [8, 10, 12, 16, 20, 25]
+cement_type: ["OPC 43", "OPC 53", "PPC", "PSC"]
+plywood_grade: ["MR", "BWR", "BWP"]
+wire_size_sqmm: [0.75, 1, 1.5, 2.5, 4, 6]
+pipe_class: ["Class 2", "Class 3", "Class 4"]
+brands:
+  cement: ["UltraTech", "Ambuja", "ACC", "Shree", "Dalmia"]
+  tmt: ["Tata Tiscon", "JSW Neosteel", "SAIL", "Vizag"]
+  wire: ["Havells", "Polycab", "Finolex", "RR Kabel"]
+  plywood: ["Century", "Greenply"]
+  tiles: ["Kajaria", "Somany"]
+  pipe_pvc: ["Supreme", "Astral", "Finolex"]

@@ -1,0 +1,14 @@
+# Conversion factors are family-specific and live per-SKU in
+# catalogue_seed.jsonl (each SKU's own "units" map). This file lists the
+# vocabulary of units the pack recognizes at all, so the loader can reject
+# an unknown unit at validation time.
+bag: {base: kg, note: "cement/PPC/PSC bag, commonly 50kg"}
+tonne: {base: kg, note: "1000kg, used for TMT/structural steel"}
+kg: {base: kg, note: "base unit for steel and cement"}
+piece: {base: piece, note: "single TMT rod, tile box unit fallback"}
+bundle: {base: piece, note: "wire coil bundle, plywood bundle"}
+rft: {base: rft, note: "running feet, structural steel/angle"}
+sqft: {base: sqft, note: "tiles"}
+box: {base: box, note: "tile box, typically covers ~1-1.5 sqm"}
+litre: {base: litre, note: "paint"}
+metre: {base: metre, note: "wire by the metre"}

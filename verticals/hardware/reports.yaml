@@ -1,0 +1,9 @@
+dashboards:
+  - id: stock_by_family
+    title: "Stock by category (cement, TMT, wire, plywood, tiles, pipe, paint)"
+  - id: gst_summary
+    title: "GST collected by HSN code"
+  - id: fast_movers
+    title: "Top-moving SKUs this month"
+  - id: dead_stock
+    title: "SKUs with no sale in 60 days"
