@@ -105,7 +105,12 @@ app.mount("/assets", StaticFiles(directory=str(FRONTEND_ASSETS)), name="assets")
 # logged-in user. It is not unguarded: the handler verifies CRON_SECRET itself
 # and picks its own user per shop.
 _OPEN_PREFIXES = ("/api/auth/", "/api/cron/", "/api/agent/", "/assets/", "/d/", "/data/")
-_OPEN_EXACT = ("/", "/favicon.ico", "/api/health")
+_OPEN_EXACT = ("/", "/favicon.ico", "/api/health",
+              # PWA shell (sub-project C): the service worker itself and the
+              # manifest it registers must be fetchable before a session
+              # exists — that is the whole point of an installable offline
+              # shell.
+              "/sw.js", "/manifest.webmanifest")
 
 
 @app.middleware("http")
@@ -619,6 +624,21 @@ def serve_document(token: str, filename: str):
 @app.get("/", response_class=HTMLResponse)
 def index():
     return (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
+
+
+@app.get("/sw.js")
+def service_worker():
+    # A service worker's scope is limited to the directory it is served
+    # from, so it must be served from the root, not from under /assets/.
+    return FileResponse(ROOT / "frontend" / "sw.js",
+                        media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/manifest.webmanifest")
+def web_manifest():
+    return FileResponse(ROOT / "frontend" / "manifest.webmanifest",
+                        media_type="application/manifest+json")
 
 
 # ---------------------------------------------------------------------------

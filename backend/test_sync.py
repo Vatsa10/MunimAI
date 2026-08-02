@@ -200,5 +200,21 @@ class SyncRoutesTests(unittest.TestCase):
         self.assertIn("dues", body)
 
 
+class PwaShellRoutesTests(unittest.TestCase):
+    """The service worker and manifest must be fetchable with no session —
+    that is the entire point of an installable offline shell."""
+
+    def test_service_worker_is_served_from_the_root_scope(self):
+        client = TestClient(main.app)
+        resp = client.get("/sw.js")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_manifest_is_served_unauthenticated(self):
+        client = TestClient(main.app)
+        resp = client.get("/manifest.webmanifest")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("start_url", resp.json())
+
+
 if __name__ == "__main__":
     unittest.main()
