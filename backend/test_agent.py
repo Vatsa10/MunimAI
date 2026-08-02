@@ -276,7 +276,8 @@ class AgentToolTests(unittest.TestCase):
 
     def test_item_details_include_cost_and_gst(self):
         out = self.call("item_details", item="ppc cement")
-        self.assertEqual(out["gst_rate"], 28)
+        # Cement moved 28% -> 18% under GST 2.0 on 22 September 2025.
+        self.assertEqual(out["gst_rate"], 18)
         self.assertIsNotNone(out["landed_cost"])
 
     def test_every_product_tool_accepts_substring_and_sku_id(self):

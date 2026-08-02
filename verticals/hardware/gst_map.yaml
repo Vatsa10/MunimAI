@@ -1,0 +1,68 @@
+# HSN codes and GST rates for the hardware vertical.
+#
+# Verified against public sources in August 2026, after GST 2.0 (56th GST
+# Council, effective 22 September 2025) collapsed the 5/12/18/28 structure into
+# 5/18/40. Several of these categories sat at 28% before that date, so any rate
+# recalled from memory rather than checked is likely to be wrong — cement and
+# tiles were both found stale in data/catalogue.json and corrected.
+#
+# Rates are national and verifiable, which is why they belong in a shipped
+# pack. Prices are not: cost_price and selling_rate are deliberately absent
+# from catalogue_seed.jsonl and stay the shop's own data.
+#
+# Re-verify before each pack release; a wrong rate here reaches every invoice.
+
+pack_version: "1.0.0"
+verified_on: "2026-08-02"
+default_gst_rate: 18
+
+categories:
+  cement:
+    hsn: "2523"
+    gst_rate: 18
+    note: "Portland, aluminous, slag cement and clinker. Was 28% until 2025-09-22."
+
+  tmt:
+    hsn: "7214"
+    gst_rate: 18
+    note: "Bars and rods of iron or non-alloy steel, hot-rolled or twisted after rolling."
+
+  structural_steel:
+    hsn: "7216"
+    gst_rate: 18
+    note: "Angles, shapes and sections. Same 18% slab as chapter 72 generally."
+
+  tiles:
+    hsn: "6907"
+    gst_rate: 18
+    note: "Ceramic and vitrified, glazed or unglazed. Was 28% until 2025-09-22."
+
+  plywood:
+    hsn: "4412"
+    gst_rate: 18
+    note: "Plywood, veneered panels, laminated wood. Was 28% for several variants."
+
+  wire:
+    hsn: "8544"
+    gst_rate: 18
+    note: "Insulated copper and aluminium wire and cable. 8-digit tariff commonly 85441190."
+
+  pipe_pvc:
+    hsn: "3917"
+    gst_rate: 18
+    note: "Rigid PVC pipes, tubes and fittings for plumbing and water supply."
+
+  paint:
+    hsn: "3208"
+    gst_rate: 18
+    note: "Solvent-based paints and varnishes. Aqueous/emulsion is 3209, also 18%."
+
+sources:
+  - "https://www.jkcement.com/blog/policies/cement-hsn-code-gst-rate-india/"
+  - "https://busy.in/hsn/tmt-bar-hsn-code/"
+  - "https://busy.in/gst-rates/steel/"
+  - "https://busy.in/gst-rates/tiles/"
+  - "https://busy.in/hsn/plywood-hsn-code/"
+  - "https://busy.in/hsn/electric-wire-hsn-code/"
+  - "https://busy.in/hsn/pvc-pipe-hsn-code/"
+  - "https://busy.in/gst-rates/paints/"
