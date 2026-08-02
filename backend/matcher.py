@@ -323,7 +323,8 @@ def _fmt_opt(attr: str, v) -> str:
 # ---------------------------------------------------------------------------
 # Top-level match
 # ---------------------------------------------------------------------------
-def match(phrase: str, catalogue: list, learning: dict, flow: str = "live_sale") -> dict:
+def match(phrase: str, catalogue: list, learning: dict, flow: str = "live_sale",
+          vertical_priors: Optional[list] = None) -> dict:
     """
     Returns one of:
       {status:"matched", sku_id, confidence, assumed}
@@ -407,6 +408,34 @@ def match(phrase: str, catalogue: list, learning: dict, flow: str = "live_sale")
         res = resolve_variant(uniq, by_id, spoken_attrs, learning)
         res["stage"] = "alias_family"
         return res
+
+    # Stage "vertical_prior" — shipped spoken-form priors for this vertical,
+    # strictly beneath shop aliases and shop learned priors (both already
+    # checked above via alias_idx, which merges catalogue aliases and
+    # learning.aliases_learned). A shop's own vocabulary always wins; this
+    # stage only fires when nothing shop-specific matched.
+    if vertical_priors:
+        vp_idx: dict = {}
+        for vp in vertical_priors:
+            key = normalize(str(vp.get("phrase") or ""))
+            ref = vp.get("sku_ref")
+            if key and ref in by_id:
+                vp_idx.setdefault(key, []).append(ref)
+        vp_hit = vp_idx.get(norm)
+        if vp_hit is None:
+            padded_vp = f" {norm} "
+            for a in sorted((a for a in vp_idx if " " in a), key=len, reverse=True):
+                if f" {a} " in padded_vp:
+                    vp_hit = vp_idx[a]
+                    break
+        if vp_hit:
+            uniq_vp = list(dict.fromkeys(vp_hit))
+            if len(uniq_vp) == 1:
+                return {"status": "matched", "sku_id": uniq_vp[0], "confidence": 0.9,
+                        "assumed": {}, "stage": "vertical_prior"}
+            res = resolve_variant(uniq_vp, by_id, spoken_attrs, learning)
+            res["stage"] = "vertical_prior_family"
+            return res
 
     # Stage 2b — attribute-based family inference (diameter -> tmt, size -> pipe).
     # Lets bare spoken attributes ("barah mm", "Fe500D wala") reach the right
