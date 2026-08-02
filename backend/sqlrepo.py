@@ -135,6 +135,20 @@ class SqlRepo:
     def events_for_sku(self, sku_id: str) -> list:
         return [e for e in self.all_events() if e.get("sku_id") == sku_id]
 
+    def set_event_seq(self, event_id: str, seq: int) -> None:
+        """Stamp the sync ordering column on an already-inserted event.
+
+        A separate UPDATE rather than a column on the INSERT above: that
+        statement's ON CONFLICT DO NOTHING is the idempotency guarantee an
+        offline outbox relies on and stays untouched (backend/sync.py calls
+        this only for events it just inserted for the first time).
+        """
+        with db.connect() as conn:
+            conn.execute(
+                "UPDATE events SET seq = %s WHERE user_id = %s AND event_id = %s",
+                (seq, self.user_id, event_id))
+        self._invalidate("events")
+
     def events_in_range(self, start: date, end: date) -> list:
         out = []
         for e in self.all_events():

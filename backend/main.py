@@ -125,7 +125,12 @@ app.mount("/assets", StaticFiles(directory=str(FRONTEND_ASSETS)), name="assets")
 # logged-in user. It is not unguarded: the handler verifies CRON_SECRET itself
 # and picks its own user per shop.
 _OPEN_PREFIXES = ("/api/auth/", "/api/cron/", "/api/agent/", "/assets/", "/d/", "/data/")
-_OPEN_EXACT = ("/", "/favicon.ico", "/api/health")
+_OPEN_EXACT = ("/", "/favicon.ico", "/api/health",
+              # PWA shell (sub-project C): the service worker itself and the
+              # manifest it registers must be fetchable before a session
+              # exists — that is the whole point of an installable offline
+              # shell.
+              "/sw.js", "/manifest.webmanifest")
 
 
 @app.middleware("http")
@@ -663,6 +668,21 @@ def index():
     return (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
 
 
+@app.get("/sw.js")
+def service_worker():
+    # A service worker's scope is limited to the directory it is served
+    # from, so it must be served from the root, not from under /assets/.
+    return FileResponse(ROOT / "frontend" / "sw.js",
+                        media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/manifest.webmanifest")
+def web_manifest():
+    return FileResponse(ROOT / "frontend" / "manifest.webmanifest",
+                        media_type="application/manifest+json")
+
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -1095,6 +1115,27 @@ def _low_stock_items(target_repo=None, *, lookback_days: int = 30,
         row["canonical"],
     ))
     return rows[:max(0, limit)]
+
+
+# ---------------------------------------------------------------------------
+# Offline sync — outbox apply + compact snapshot (spec section 5, sub-project C)
+# ---------------------------------------------------------------------------
+@app.post("/api/sync/outbox")
+def sync_outbox(payload: dict = Body(...)):
+    """An offline client's queued events, posted wholesale on reconnect.
+
+    Idempotent: resending an outbox the server has already seen some or all
+    of is always safe (backend/sync.py dedupes on event_id).
+    """
+    import sync
+    return sync.apply_outbox(repo, payload.get("events") or [])
+
+
+@app.get("/api/sync/snapshot")
+def sync_snapshot():
+    """Compact stock/dues state for the client to replay local events onto."""
+    import sync
+    return sync.snapshot(repo)
 
 
 # ---------------------------------------------------------------------------

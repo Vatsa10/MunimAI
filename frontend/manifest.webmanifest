@@ -1,0 +1,20 @@
+{
+  "name": "Munim.ai — Awaaz se hisaab",
+  "short_name": "Munim.ai",
+  "description": "Voice-first stock and credit ledger for shopkeepers. Works offline for sale entry, bill print, stock lookup and customer dues.",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0f14",
+  "theme_color": "#0b0f14",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/assets/munim-dot-ai-logo-v3.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
